@@ -1,5 +1,7 @@
 # scte35-reader
 
+[![crates.io version](https://img.shields.io/crates/v/scte35-reader.svg)](https://crates.io/crates/scte35-reader)
+
 Parser data formatted according to [SCTE-35](http://www.scte.org/SCTEDocs/Standards/SCTE%2035%202016.pdf).
 
 For an example of usage, see the [scte35dump](https://github.com/dholroyd/scte35dump) tool.
