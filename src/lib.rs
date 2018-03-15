@@ -295,12 +295,15 @@ where
 {
     processor: P,
 }
-impl<P> psi::SectionProcessor<demultiplex::FilterChangeset> for Scte35SectionProcessor<P>
+impl<P> psi::SectionProcessor for Scte35SectionProcessor<P>
 where
     P: SpliceInfoProcessor
 {
-    fn process(&mut self, header: &psi::SectionCommonHeader, section_data: &[u8]) -> Option<demultiplex::FilterChangeset> {
+    type Ret = demultiplex::FilterChangeset;
+
+    fn start_section<'a>(&mut self, header: &psi::SectionCommonHeader, data: &'a [u8]) -> Option<Self::Ret> {
         if header.table_id == 0xfc {
+            let section_data = &data[psi::SectionCommonHeader::SIZE..];
             if section_data.len() < SpliceInfoHeader::HEADER_LENGTH + 4 {
                 println!("section data too short: {} (must be at least {})", section_data.len(), SpliceInfoHeader::HEADER_LENGTH + 4);
                 return None
@@ -328,6 +331,14 @@ where
             println!("bad table_id for scte35: {:#x} (expected 0xfc)", header.table_id);
         }
         None
+    }
+
+    fn continue_section<'a>(&mut self, _section_data: &'a [u8]) -> Option<Self::Ret> {
+        unimplemented!()
+    }
+
+    fn reset(&mut self) {
+        unimplemented!()
     }
 }
 impl<P> Scte35SectionProcessor<P>
@@ -445,10 +456,10 @@ mod tests {
     #[test]
     fn it_works() {
         let data = hex!("fc302500000000000000fff01405000000017feffe2d142b00fe0123d3080001010100007f157a49");
-        let mut parser = psi::SectionParser::new(|header, buf| {
-            let processor = MockSpliceProcessor;
-            Scte35SectionProcessor::new(processor).process(header, buf)
-        });
-        parser.begin_new_section(&data[..]);
+        let mut parser = Scte35SectionProcessor::new(
+            MockSpliceProcessor
+        );
+        let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
+        parser.start_section(&header, &data[..]);
     }
 }
