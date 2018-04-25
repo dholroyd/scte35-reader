@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[macro_use]
+extern crate mpeg2ts_reader;
+#[cfg(not(test))]
 extern crate mpeg2ts_reader;
 extern crate bitreader;
 #[cfg(test)]
@@ -8,6 +12,7 @@ extern crate hex_literal;
 extern crate matches;
 
 use std::fmt;
+use std::marker;
 use mpeg2ts_reader::psi;
 use mpeg2ts_reader::demultiplex;
 
@@ -289,24 +294,25 @@ impl<'buf> Iterator for SpliceDescriptorIter<'buf> {
     }
 }
 
-pub struct Scte35SectionProcessor<P>
+pub struct Scte35SectionProcessor<P, Ctx: demultiplex::DemuxContext>
 where
     P: SpliceInfoProcessor
 {
     processor: P,
+    phantom: marker::PhantomData<Ctx>,
 }
-impl<P> psi::SectionProcessor for Scte35SectionProcessor<P>
+impl<P, Ctx: demultiplex::DemuxContext> psi::SectionProcessor for Scte35SectionProcessor<P, Ctx>
 where
     P: SpliceInfoProcessor
 {
-    type Ret = demultiplex::FilterChangeset;
+    type Context = Ctx;
 
-    fn start_section<'a>(&mut self, header: &psi::SectionCommonHeader, data: &'a [u8]) -> Option<Self::Ret> {
+    fn start_section<'a>(&mut self, _ctx: &mut Self::Context, header: &psi::SectionCommonHeader, data: &'a [u8]) {
         if header.table_id == 0xfc {
             let section_data = &data[psi::SectionCommonHeader::SIZE..];
             if section_data.len() < SpliceInfoHeader::HEADER_LENGTH + 4 {
                 println!("section data too short: {} (must be at least {})", section_data.len(), SpliceInfoHeader::HEADER_LENGTH + 4);
-                return None
+                return;
             }
             // trim off the 32-bit CRC, TODO: check the CRC!  (possibly in calling code rather than here?)
             let section_data = &section_data[..section_data.len()-4];
@@ -330,10 +336,9 @@ where
         } else {
             println!("bad table_id for scte35: {:#x} (expected 0xfc)", header.table_id);
         }
-        None
     }
 
-    fn continue_section<'a>(&mut self, _section_data: &'a [u8]) -> Option<Self::Ret> {
+    fn continue_section<'a>(&mut self, _ctx: &mut Self::Context, _section_data: &'a [u8]) {
         unimplemented!()
     }
 
@@ -341,15 +346,16 @@ where
         unimplemented!()
     }
 }
-impl<P> Scte35SectionProcessor<P>
+impl<P, Ctx: demultiplex::DemuxContext> Scte35SectionProcessor<P, Ctx>
 where
     P: SpliceInfoProcessor
 {
     // FIXME: get rid of all unwrap()
 
-    pub fn new(processor: P) -> Scte35SectionProcessor<P> {
+    pub fn new(processor: P) -> Scte35SectionProcessor<P, Ctx> {
         Scte35SectionProcessor {
-            processor
+            processor,
+            phantom: marker::PhantomData,
         }
     }
     fn splice_null(payload: &[u8]) -> SpliceCommand {
@@ -440,7 +446,18 @@ where
 mod tests {
     use mpeg2ts_reader::psi;
     use mpeg2ts_reader::psi::SectionProcessor;
+    use mpeg2ts_reader::demultiplex;
     use super::*;
+
+    demux_context!(NullDemuxContext, NullStreamConstructor);
+    pub struct NullStreamConstructor;
+    impl demultiplex::StreamConstructor for NullStreamConstructor {
+        type F = demultiplex::NullPacketFilter<NullDemuxContext>;
+
+        fn construct(&mut self, _req: demultiplex::FilterRequest) -> Self::F {
+            unimplemented!();
+        }
+    }
 
     struct MockSpliceProcessor;
     impl SpliceInfoProcessor for MockSpliceProcessor {
@@ -460,6 +477,7 @@ mod tests {
             MockSpliceProcessor
         );
         let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
-        parser.start_section(&header, &data[..]);
+        let mut ctx = NullDemuxContext::new(NullStreamConstructor);
+        parser.start_section(&mut ctx, &header, &data[..]);
     }
 }
