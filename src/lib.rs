@@ -221,36 +221,45 @@ pub enum SpliceDescriptor {
     },
 }
 impl SpliceDescriptor {
-    fn parse(buf: &[u8]) -> SpliceDescriptor {
+    fn parse(buf: &[u8]) -> Result<SpliceDescriptor,SpliceDescriptorErr> {
+        if buf.len() < 6 {
+            return Err(SpliceDescriptorErr::NotEnoughData { actual: buf.len(), expected: 6 });
+        }
         let splice_descriptor_tag = buf[0];
-        let id = &buf[2..5];
-        if id != b"CUEI" {
-            return SpliceDescriptor::Reserved {
-                tag: splice_descriptor_tag,
-                identifier: [id[0], id[1], id[2], id[3]],
-                private_bytes: buf[6..].to_owned(),
-            };
+        let splice_descriptor_len = buf[1] as usize;
+        let splice_descriptor_end = splice_descriptor_len + 2;
+        if splice_descriptor_end > buf.len() {
+            return Err(SpliceDescriptorErr::NotEnoughData { actual: buf.len(), expected: splice_descriptor_end });
         }
-        match splice_descriptor_tag {
-            0x00 => SpliceDescriptor::AvailDescriptor {
-                provider_avail_id: u32::from(buf[6])<<24 | u32::from(buf[7])<<16 | u32::from(buf[8])<<8 | u32::from(buf[9])
-            },
-            0x01 => SpliceDescriptor::DTMFDescriptor,
-            0x02 => SpliceDescriptor::SegmentationDescriptor,
-            0x03 => SpliceDescriptor::TimeDescriptor,
-            _ => SpliceDescriptor::Reserved {
+        let id = &buf[2..6];
+        Ok(if id != b"CUEI" {
+            SpliceDescriptor::Reserved {
                 tag: splice_descriptor_tag,
                 identifier: [id[0], id[1], id[2], id[3]],
-                private_bytes: buf[6..].to_owned(),
+                private_bytes: buf[6..splice_descriptor_end].to_owned(),
             }
-        }
+        } else {
+            match splice_descriptor_tag {
+                0x00 => SpliceDescriptor::AvailDescriptor {
+                    provider_avail_id: u32::from(buf[6])<<24 | u32::from(buf[7])<<16 | u32::from(buf[8])<<8 | u32::from(buf[9])
+                },
+                0x01 => SpliceDescriptor::DTMFDescriptor,
+                0x02 => SpliceDescriptor::SegmentationDescriptor,
+                0x03 => SpliceDescriptor::TimeDescriptor,
+                _ => SpliceDescriptor::Reserved {
+                    tag: splice_descriptor_tag,
+                    identifier: [id[0], id[1], id[2], id[3]],
+                    private_bytes: buf[6..splice_descriptor_end].to_owned(),
+                }
+            }
+        })
     }
 }
 
 #[derive(Debug)]
 pub enum SpliceDescriptorErr {
-    InvalidDescriptorLength(u8),
-    NotEnoughData { expected: u8, actual: u8 }
+    InvalidDescriptorLength(usize),
+    NotEnoughData { expected: usize, actual: usize }
 }
 
 pub struct SpliceDescriptorIter<'buf> {
@@ -272,15 +281,15 @@ impl<'buf> Iterator for SpliceDescriptorIter<'buf> {
             self.buf = &self.buf[0..0];
             return Some(Err(SpliceDescriptorErr::NotEnoughData{
                 expected: 2,
-                actual: self.buf.len() as u8
+                actual: self.buf.len()
             }));
         }
-        let descriptor_length = self.buf[1];
-        if self.buf.len() < usize::from(descriptor_length+2) {
+        let descriptor_length = self.buf[1] as usize;
+        if self.buf.len() < descriptor_length+2 {
             self.buf = &self.buf[0..0];
             return Some(Err(SpliceDescriptorErr::NotEnoughData{
                 expected: descriptor_length+2,
-                actual: self.buf.len() as u8
+                actual: self.buf.len()
             }));
         }
         if descriptor_length > 254 {
@@ -290,7 +299,7 @@ impl<'buf> Iterator for SpliceDescriptorIter<'buf> {
         let (desc, rest) = self.buf.split_at(usize::from(2+descriptor_length));
         let result = SpliceDescriptor::parse(desc);
         self.buf = rest;
-        Some(Ok(result))
+        Some(result)
     }
 }
 
@@ -492,5 +501,15 @@ mod tests {
         let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
         let mut ctx = NullDemuxContext::new(NullStreamConstructor);
         parser.start_section(&mut ctx, &header, &data[..]);
+    }
+
+    #[test]
+    fn splice_descriptor() {
+        let data = [];
+        assert_matches!(SpliceDescriptor::parse(&data[..]), Err(SpliceDescriptorErr::NotEnoughData { .. }));
+        let data = hex!("01084D5949440000");  // descriptor payload too short
+        assert_matches!(SpliceDescriptor::parse(&data[..]), Err(SpliceDescriptorErr::NotEnoughData { .. }));
+        let data = hex!("01084D59494400000003");
+        assert_matches!(SpliceDescriptor::parse(&data[..]), Ok(SpliceDescriptor::Reserved { tag: 01, identifier: [0x4D, 0x59, 0x49, 0x44], private_bytes: _ }));
     }
 }
