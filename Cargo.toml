@@ -1,6 +1,6 @@
 [package]
 name = "scte35-reader"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["David Holroyd <dave@badgers-in-foil.co.uk>"]
 description = "Reader for data formatted according to SCTE-35"
 repository = "https://github.com/dholroyd/scte35-reader"
@@ -9,7 +9,7 @@ readme = "README.md"
 license = "MIT/Apache-2.0"
 
 [dependencies]
-mpeg2ts-reader = "0.4.0"
+mpeg2ts-reader = "0.5.0"
 bitreader = "0.3.1"
 
 
