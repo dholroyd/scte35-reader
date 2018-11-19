@@ -130,6 +130,9 @@ pub enum SpliceCommand {
         reserved: u8,
         splice_detail: SpliceInsert,
     },
+    TimeSignal {
+        splice_time: SpliceTime
+    }
 }
 
 #[derive(Debug)]
@@ -372,6 +375,7 @@ where
             let splice_command = match splice_header.splice_command_type() {
                 SpliceCommandType::SpliceNull => Some(Self::splice_null(payload)),
                 SpliceCommandType::SpliceInsert => Some(Self::splice_insert(payload)),
+                SpliceCommandType::TimeSignal => Some(Self::time_signal(payload)),
                 _ => None,
             };
             if let Some(splice_command) = splice_command {
@@ -429,6 +433,16 @@ where
             splice_event_id,
             reserved,
             splice_detail: Self::read_splice_detail(&mut r, splice_event_cancel_indicator),
+        };
+        assert_eq!(r.position() as usize, payload.len() * 8);
+        result
+    }
+
+    fn time_signal(payload: &[u8]) -> SpliceCommand {
+        let mut r = bitreader::BitReader::new(payload);
+
+        let result = SpliceCommand::TimeSignal {
+            splice_time: SpliceTime::Timed(Self::read_splice_time(&mut r))
         };
         assert_eq!(r.position() as usize, payload.len() * 8);
         result
@@ -530,8 +544,8 @@ mod tests {
         }
     }
 
-    struct MockSpliceProcessor;
-    impl SpliceInfoProcessor for MockSpliceProcessor {
+    struct MockSpliceInsertProcessor;
+    impl SpliceInfoProcessor for MockSpliceInsertProcessor {
         fn process(
             &self,
             header: SpliceInfoHeader,
@@ -551,7 +565,34 @@ mod tests {
         let data = hex!(
             "fc302500000000000000fff01405000000017feffe2d142b00fe0123d3080001010100007f157a49"
         );
-        let mut parser = Scte35SectionProcessor::new(MockSpliceProcessor);
+        let mut parser = Scte35SectionProcessor::new(MockSpliceInsertProcessor);
+        let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
+        let mut ctx = NullDemuxContext::new(NullStreamConstructor);
+        parser.start_section(&mut ctx, &header, &data[..]);
+    }
+
+    struct MockTimeSignalProcessor;
+    impl SpliceInfoProcessor for MockTimeSignalProcessor {
+        fn process(
+            &self,
+            header: SpliceInfoHeader,
+            command: SpliceCommand,
+            descriptors: SpliceDescriptorIter,
+        ) {
+            assert_eq!(header.encryption_algorithm(), EncryptionAlgorithm::None);
+            assert_matches!(command, SpliceCommand::TimeSignal{..});
+            for d in descriptors {
+                d.unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn it_understands_time_signal() {
+        let data = hex!(
+            "fc302700000000000000fff00506ff592d03c00011020f43554549000000017fbf000010010112ce0e6b"
+        );
+        let mut parser = Scte35SectionProcessor::new(MockTimeSignalProcessor);
         let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
         let mut ctx = NullDemuxContext::new(NullStreamConstructor);
         parser.start_section(&mut ctx, &header, &data[..]);
