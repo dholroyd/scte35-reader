@@ -15,7 +15,7 @@ A subset of possible SCTE-35 syntax is currently handled:
  - [x] `splice_null()`
  - [ ] `splice_schedule()`
  - [x] `splice_insert()`
- - [ ] `time_signal()`
+ - [x] `time_signal()`
  - [ ] `bandwidth_reservation()`
  - [ ] `private_command()`
 
