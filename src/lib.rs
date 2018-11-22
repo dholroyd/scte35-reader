@@ -219,7 +219,7 @@ pub enum SegmentationUpidType {
     MID,
     ADS,
     URI,
-    Reserved
+    Reserved(u8)
 }
 impl SegmentationUpidType {
     pub fn from_type(id: u8) -> SegmentationUpidType {
@@ -240,7 +240,7 @@ impl SegmentationUpidType {
             13 => SegmentationUpidType::MID,
             14 => SegmentationUpidType::ADS,
             15 => SegmentationUpidType::URI,
-            _ => SegmentationUpidType::Reserved
+            _ => SegmentationUpidType::Reserved(id)
         }
     }
 }
@@ -275,7 +275,7 @@ pub enum SegmentationTypeId {
     UnscheduledEventEnd,
     NetworkStart,
     NetworkEnd,
-    Reserved
+    Reserved(u8)
 }
 impl SegmentationTypeId {
     pub fn from_id(id: u8) -> SegmentationTypeId {
@@ -308,7 +308,7 @@ impl SegmentationTypeId {
             65 => SegmentationTypeId::UnscheduledEventEnd,
             80 => SegmentationTypeId::NetworkStart,
             81 => SegmentationTypeId::NetworkEnd,
-            _ => SegmentationTypeId::Reserved
+            _ => SegmentationTypeId::Reserved(id)
         }
     }
 }
@@ -318,20 +318,6 @@ pub enum SegmentationUpid {
     None,
     SegmentationUpid {
         upid: Vec<u8>
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Flag {
-    NotSet,
-    Set
-}
-impl Flag {
-    pub fn from_flag(flag: bool) -> Flag {
-        match flag {
-            false => Flag::NotSet,
-            true => Flag::Set
-        }
     }
 }
 
@@ -361,9 +347,9 @@ impl DeviceRestrictions {
 pub enum DeliveryRestrictionFlags {
     None,
     DeliveryRestrictions {
-        web_delivery_allowed_flag: Flag,
-        no_regional_blackout_flag: Flag,
-        archive_allowed_flag: Flag,
+        web_delivery_allowed_flag: bool,
+        no_regional_blackout_flag: bool,
+        archive_allowed_flag: bool,
         device_restrictions: DeviceRestrictions
     }
 }
@@ -386,9 +372,9 @@ pub struct SegmentationModeComponent {
 pub enum SegmentationDescriptor {
     Cancel,
     Insert {
-        program_segmentation_flag: Flag,
-        segmentation_duration_flag: Flag,
-        delivery_not_restricted_flag: Flag,
+        program_segmentation_flag: bool,
+        segmentation_duration_flag: bool,
+        delivery_not_restricted_flag: bool,
         delivery_restrictions: DeliveryRestrictionFlags,
         segmentation_mode: SegmentationMode,
         segmentation_duration: Option<u64>,
@@ -447,15 +433,15 @@ impl SpliceDescriptor {
         if cancelled {
             SegmentationDescriptor::Cancel
         } else {
-            let program_segmentation_flag = Flag::from_flag(r.read_bool().unwrap());
-            let segmentation_duration_flag = Flag::from_flag(r.read_bool().unwrap());
-            let delivery_not_restricted_flag = Flag::from_flag(r.read_bool().unwrap());
+            let program_segmentation_flag = r.read_bool().unwrap();
+            let segmentation_duration_flag = r.read_bool().unwrap();
+            let delivery_not_restricted_flag = r.read_bool().unwrap();
             let delivery_restrictions;
-            if delivery_not_restricted_flag == Flag::NotSet {
+            if !delivery_not_restricted_flag {
                 delivery_restrictions = DeliveryRestrictionFlags::DeliveryRestrictions {
-                    web_delivery_allowed_flag: Flag::from_flag(r.read_bool().unwrap()),
-                    no_regional_blackout_flag: Flag::from_flag(r.read_bool().unwrap()),
-                    archive_allowed_flag: Flag::from_flag(r.read_bool().unwrap()),
+                    web_delivery_allowed_flag: r.read_bool().unwrap(),
+                    no_regional_blackout_flag: r.read_bool().unwrap(),
+                    archive_allowed_flag: r.read_bool().unwrap(),
                     device_restrictions: DeviceRestrictions::from_bits(r.read_u8(2).unwrap())
                 }
             } else {
@@ -463,7 +449,7 @@ impl SpliceDescriptor {
                 r.skip(5).unwrap();
             }
             let segmentation_mode;
-            if program_segmentation_flag == Flag::NotSet {
+            if !program_segmentation_flag {
                 let component_count = r.read_u8(8).unwrap();
                 let mut components = Vec::with_capacity(component_count as usize);
 
@@ -485,7 +471,7 @@ impl SpliceDescriptor {
             }
 
             let duration;
-            if segmentation_duration_flag == Flag::Set {
+            if segmentation_duration_flag {
                 duration = Some(r.read_u64(40).unwrap());
             } else {
                 duration = None;
@@ -985,9 +971,9 @@ mod tests {
             Ok(SpliceDescriptor::SegmentationDescriptor {
                 segmentation_event_id: 1,
                 descriptor_detail: SegmentationDescriptor::Insert {
-                    program_segmentation_flag: Flag::Set,
-                    segmentation_duration_flag: Flag::NotSet,
-                    delivery_not_restricted_flag: Flag::Set,
+                    program_segmentation_flag: true,
+                    segmentation_duration_flag: false,
+                    delivery_not_restricted_flag: true,
                     delivery_restrictions: DeliveryRestrictionFlags::None,
                     segmentation_mode: SegmentationMode::Program,
                     segmentation_duration: None,
