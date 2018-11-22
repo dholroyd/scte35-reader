@@ -132,7 +132,8 @@ pub enum SpliceCommand {
     },
     TimeSignal {
         splice_time: SpliceTime
-    }
+    },
+    BandwidthReservation {}
 }
 
 #[derive(Debug)]
@@ -376,6 +377,7 @@ where
                 SpliceCommandType::SpliceNull => Some(Self::splice_null(payload)),
                 SpliceCommandType::SpliceInsert => Some(Self::splice_insert(payload)),
                 SpliceCommandType::TimeSignal => Some(Self::time_signal(payload)),
+                SpliceCommandType::BandwidthReservation => Some(Self::bandwidth_reservation(payload)),
                 _ => None,
             };
             if let Some(splice_command) = splice_command {
@@ -446,6 +448,11 @@ where
         };
         assert_eq!(r.position() as usize, payload.len() * 8);
         result
+    }
+
+    fn bandwidth_reservation(payload: &[u8]) -> SpliceCommand {
+        assert_eq!(0, payload.len());
+        SpliceCommand::BandwidthReservation {}
     }
 
     fn read_splice_detail(
