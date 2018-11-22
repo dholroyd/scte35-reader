@@ -16,14 +16,14 @@ A subset of possible SCTE-35 syntax is currently handled:
  - [ ] `splice_schedule()`
  - [x] `splice_insert()`
  - [x] `time_signal()`
- - [ ] `bandwidth_reservation()`
+ - [x] `bandwidth_reservation()`
  - [ ] `private_command()`
 
 ### Descriptors
 
  - [x] `avail_descriptor`
- - [ ] `DTMF_descriptor`
- - [ ] `segmentation_descriptor`
- - [ ] `time_descriptor`
+ - [x] `DTMF_descriptor`
+ - [x] `segmentation_descriptor`
+ - [x] `time_descriptor`
  - [x] _Reserved_ - Descriptors with tags values that are 'reserved' in SCTE-35 are supported in the sense that the application
        gets access to the descriptor byte values, and can parse them with application-specific logic.

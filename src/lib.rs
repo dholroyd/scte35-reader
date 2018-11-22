@@ -132,7 +132,8 @@ pub enum SpliceCommand {
     },
     TimeSignal {
         splice_time: SpliceTime
-    }
+    },
+    BandwidthReservation {}
 }
 
 #[derive(Debug)]
@@ -200,6 +201,194 @@ impl ReturnMode {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum SegmentationUpidType {
+    NotUsed,
+    UserDefinedDeprecated,
+    ISCIDeprecated,
+    AdID,
+    UMID,
+    ISANDeprecated,
+    ISAN,
+    TID,
+    TI,
+    ADI,
+    EIDR,
+    ATSC,
+    MPU,
+    MID,
+    ADS,
+    URI,
+    Reserved(u8)
+}
+impl SegmentationUpidType {
+    pub fn from_type(id: u8) -> SegmentationUpidType {
+        match id {
+            0 => SegmentationUpidType::NotUsed,
+            1 => SegmentationUpidType::UserDefinedDeprecated,
+            2 => SegmentationUpidType::ISCIDeprecated,
+            3 => SegmentationUpidType::AdID,
+            4 => SegmentationUpidType::UMID,
+            5 => SegmentationUpidType::ISANDeprecated,
+            6 => SegmentationUpidType::ISAN,
+            7 => SegmentationUpidType::TID,
+            8 => SegmentationUpidType::TI,
+            9 => SegmentationUpidType::ADI,
+            10 => SegmentationUpidType::EIDR,
+            11 => SegmentationUpidType::ATSC,
+            12 => SegmentationUpidType::MPU,
+            13 => SegmentationUpidType::MID,
+            14 => SegmentationUpidType::ADS,
+            15 => SegmentationUpidType::URI,
+            _ => SegmentationUpidType::Reserved(id)
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SegmentationTypeId {
+    NotIndicated,
+    ContentIdentification,
+    ProgramStart,
+    ProgramEnd,
+    ProgramEarlyTermination,
+    ProgramBreakaway,
+    ProgramResumption,
+    ProgramRunoverPlanned,
+    ProgramRunoverUnplanned,
+    ProgramOverlapStart,
+    ProgramBlackoutOverride,
+    ProgramStartInProgress,
+    ChapterStart,
+    ChapterEnd,
+    BreakStart,
+    BreakEnd,
+    ProviderAdvertisementStart,
+    ProviderAdvertisementEnd,
+    DistributorAdvertisementStart,
+    DistributorAdvertisementEnd,
+    ProviderPlacementOpportunityStart,
+    ProviderPlacementOpportunityEnd,
+    DistributorPlacementOpportunityStart,
+    DistributorPlacementOpportunityEnd,
+    UnscheduledEventStart,
+    UnscheduledEventEnd,
+    NetworkStart,
+    NetworkEnd,
+    Reserved(u8)
+}
+impl SegmentationTypeId {
+    pub fn from_id(id: u8) -> SegmentationTypeId {
+        match id {
+            0 => SegmentationTypeId::NotIndicated,
+            1 => SegmentationTypeId::ContentIdentification,
+            16 => SegmentationTypeId::ProgramStart,
+            17 => SegmentationTypeId::ProgramEnd,
+            18 => SegmentationTypeId::ProgramEarlyTermination,
+            19 => SegmentationTypeId::ProgramBreakaway,
+            20 => SegmentationTypeId::ProgramResumption,
+            21 => SegmentationTypeId::ProgramRunoverPlanned,
+            22 => SegmentationTypeId::ProgramRunoverUnplanned,
+            23 => SegmentationTypeId::ProgramOverlapStart,
+            24 => SegmentationTypeId::ProgramBlackoutOverride,
+            25 => SegmentationTypeId::ProgramStartInProgress,
+            32 => SegmentationTypeId::ChapterStart,
+            33 => SegmentationTypeId::ChapterEnd,
+            34 => SegmentationTypeId::BreakStart,
+            35 => SegmentationTypeId::BreakEnd,
+            48 => SegmentationTypeId::ProviderAdvertisementStart,
+            49 => SegmentationTypeId::ProviderAdvertisementEnd,
+            50 => SegmentationTypeId::DistributorAdvertisementStart,
+            51 => SegmentationTypeId::DistributorAdvertisementEnd,
+            52 => SegmentationTypeId::ProviderPlacementOpportunityStart,
+            53 => SegmentationTypeId::ProviderPlacementOpportunityEnd,
+            54 => SegmentationTypeId::DistributorPlacementOpportunityStart,
+            55 => SegmentationTypeId::DistributorPlacementOpportunityEnd,
+            64 => SegmentationTypeId::UnscheduledEventStart,
+            65 => SegmentationTypeId::UnscheduledEventEnd,
+            80 => SegmentationTypeId::NetworkStart,
+            81 => SegmentationTypeId::NetworkEnd,
+            _ => SegmentationTypeId::Reserved(id)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SegmentationUpid {
+    None,
+    SegmentationUpid {
+        upid: Vec<u8>
+    }
+}
+
+#[derive(Debug)]
+pub enum DeviceRestrictions {
+    RestrictGroup0,
+    RestrictGroup1,
+    RestrictGroup2,
+    None
+}
+impl DeviceRestrictions {
+    /// panics if `id` is something other than `0` or `1`
+    pub fn from_bits(restriction: u8) -> DeviceRestrictions {
+        match restriction {
+            0 => DeviceRestrictions::RestrictGroup0,
+            1 => DeviceRestrictions::RestrictGroup1,
+            2 => DeviceRestrictions::RestrictGroup2,
+            3 => DeviceRestrictions::None,
+            _ => panic!(
+                "Invalid device_restrictions value: {} (expected 0, 1, 2, 3)",
+            restriction),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum DeliveryRestrictionFlags {
+    None,
+    DeliveryRestrictions {
+        web_delivery_allowed_flag: bool,
+        no_regional_blackout_flag: bool,
+        archive_allowed_flag: bool,
+        device_restrictions: DeviceRestrictions
+    }
+}
+
+#[derive(Debug)]
+pub enum SegmentationMode {
+    Program,
+    Component {
+        components: Vec<SegmentationModeComponent>
+    }
+}
+
+#[derive(Debug)]
+pub struct SegmentationModeComponent {
+    component_tag: u8,
+    pts_offset: u64
+}
+
+#[derive(Debug)]
+pub enum SegmentationDescriptor {
+    Cancel,
+    Insert {
+        program_segmentation_flag: bool,
+        segmentation_duration_flag: bool,
+        delivery_not_restricted_flag: bool,
+        delivery_restrictions: DeliveryRestrictionFlags,
+        segmentation_mode: SegmentationMode,
+        segmentation_duration: Option<u64>,
+        segmentation_upid_type: SegmentationUpidType,
+        segmentation_upid_length: u8,
+        segmentation_upid: SegmentationUpid,
+        segmentation_type_id: SegmentationTypeId,
+        segment_num: u8,
+        segments_expected: u8,
+        sub_segment_num: u8,
+        sub_segments_expected: u8,
+    },
+}
+
 #[derive(Debug)]
 pub struct SpliceDuration {
     return_mode: ReturnMode,
@@ -220,9 +409,19 @@ pub enum SpliceDescriptor {
     AvailDescriptor {
         provider_avail_id: u32,
     },
-    DTMFDescriptor,         // TODO
-    SegmentationDescriptor, // TODO
-    TimeDescriptor,         // TODO
+    DTMFDescriptor {
+        preroll: u8,
+        dtmf_chars: Vec<u8>
+    },
+    SegmentationDescriptor {
+        segmentation_event_id: u32,
+        descriptor_detail: SegmentationDescriptor,
+    },
+    TimeDescriptor {
+        tai_seconds: u64,
+        tai_nanoseconds: u32,
+        utc_offset: u16
+    },
     Reserved {
         tag: u8,
         identifier: [u8; 4],
@@ -230,6 +429,133 @@ pub enum SpliceDescriptor {
     },
 }
 impl SpliceDescriptor {
+    fn parse_segmentation_descriptor_details(r: &mut bitreader::BitReader, cancelled: bool) -> SegmentationDescriptor {
+        if cancelled {
+            SegmentationDescriptor::Cancel
+        } else {
+            let program_segmentation_flag = r.read_bool().unwrap();
+            let segmentation_duration_flag = r.read_bool().unwrap();
+            let delivery_not_restricted_flag = r.read_bool().unwrap();
+            let delivery_restrictions;
+            if !delivery_not_restricted_flag {
+                delivery_restrictions = DeliveryRestrictionFlags::DeliveryRestrictions {
+                    web_delivery_allowed_flag: r.read_bool().unwrap(),
+                    no_regional_blackout_flag: r.read_bool().unwrap(),
+                    archive_allowed_flag: r.read_bool().unwrap(),
+                    device_restrictions: DeviceRestrictions::from_bits(r.read_u8(2).unwrap())
+                }
+            } else {
+                delivery_restrictions = DeliveryRestrictionFlags::None;
+                r.skip(5).unwrap();
+            }
+            let segmentation_mode;
+            if !program_segmentation_flag {
+                let component_count = r.read_u8(8).unwrap();
+                let mut components = Vec::with_capacity(component_count as usize);
+
+                for _i in 0..component_count - 1 {
+                    let component_tag = r.read_u8(8).unwrap();
+                    r.skip(7).unwrap();
+                    let pts_offset = r.read_u64(33).unwrap();
+                    components.push(SegmentationModeComponent {
+                        component_tag: component_tag,
+                        pts_offset: pts_offset
+                    })
+                }
+
+                segmentation_mode = SegmentationMode::Component {
+                    components: components
+                };
+            } else {
+                segmentation_mode = SegmentationMode::Program;
+            }
+
+            let duration;
+            if segmentation_duration_flag {
+                duration = Some(r.read_u64(40).unwrap());
+            } else {
+                duration = None;
+            }
+
+            let segmentation_upid_type = SegmentationUpidType::from_type(r.read_u8(8).unwrap());
+            let segmentation_upid_length = r.read_u8(8).unwrap();
+            let segmentation_upid;
+            if segmentation_upid_length > 0 {
+                let mut upid = Vec::with_capacity(segmentation_upid_length as usize);
+                for _i in 0..segmentation_upid_length - 1 {
+                    upid.push(r.read_u8(8).unwrap());
+                }
+                segmentation_upid = SegmentationUpid::SegmentationUpid {
+                    upid
+                };
+            } else {
+                segmentation_upid = SegmentationUpid::None;
+            }
+
+            let segmentation_type_id = SegmentationTypeId::from_id(r.read_u8(8).unwrap());
+            let segment_num = r.read_u8(8).unwrap();
+            let segments_expected = r.read_u8(8).unwrap();
+
+            let sub_segment_num;
+            let sub_segments_expected;
+            if segmentation_type_id == SegmentationTypeId::ProviderPlacementOpportunityStart
+                || segmentation_type_id == SegmentationTypeId::DistributorPlacementOpportunityStart {
+                sub_segment_num = r.read_u8(8).unwrap();
+                sub_segments_expected = r.read_u8(8).unwrap();
+            } else {
+                sub_segment_num = 0;
+                sub_segments_expected = 0;
+            }
+
+            SegmentationDescriptor::Insert {
+                program_segmentation_flag: program_segmentation_flag,
+                segmentation_duration_flag: segmentation_duration_flag,
+                delivery_not_restricted_flag: delivery_not_restricted_flag,
+                delivery_restrictions: delivery_restrictions,
+                segmentation_mode: segmentation_mode,
+                segmentation_duration: duration,
+                segmentation_upid_type: segmentation_upid_type,
+                segmentation_upid_length: segmentation_upid_length,
+                segmentation_upid: segmentation_upid,
+                segmentation_type_id: segmentation_type_id,
+                segment_num: segment_num,
+                segments_expected: segments_expected,
+                sub_segment_num: sub_segment_num,
+                sub_segments_expected: sub_segments_expected
+            }
+        }
+    }
+
+    fn parse_segmentation_descriptor(buf: &[u8]) -> SpliceDescriptor {
+        let mut r = bitreader::BitReader::new(buf);
+        let id = r.read_u32(32).unwrap();
+        let cancel = r.read_bool().unwrap();
+        r.skip(7).unwrap();
+
+        let result = SpliceDescriptor::SegmentationDescriptor {
+            segmentation_event_id: id,
+            descriptor_detail: Self::parse_segmentation_descriptor_details(&mut r, cancel)
+        };
+
+        assert_eq!(r.position() as usize, buf.len() * 8);
+        result
+    }
+
+    fn parse_dtmf_descriptor(buf: &[u8]) -> SpliceDescriptor {
+        let mut r = bitreader::BitReader::new(buf);
+        let preroll = r.read_u8(8).unwrap();
+        let dtmf_count = r.read_u8(3).unwrap();
+        r.skip(5).unwrap();
+        let mut dtmf_chars = Vec::with_capacity(dtmf_count as usize);
+        for _i in 0..dtmf_count - 1 {
+            dtmf_chars.push(r.read_u8(8).unwrap())
+        }
+        assert_eq!(r.position() as usize, buf.len() * 8);
+        SpliceDescriptor::DTMFDescriptor {
+            preroll: preroll,
+            dtmf_chars: dtmf_chars
+        }
+    }
     fn parse(buf: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
         if buf.len() < 6 {
             return Err(SpliceDescriptorErr::NotEnoughData {
@@ -261,9 +587,22 @@ impl SpliceDescriptor {
                         | u32::from(buf[8]) << 8
                         | u32::from(buf[9]),
                 },
-                0x01 => SpliceDescriptor::DTMFDescriptor,
-                0x02 => SpliceDescriptor::SegmentationDescriptor,
-                0x03 => SpliceDescriptor::TimeDescriptor,
+                0x01 => Self::parse_dtmf_descriptor(&buf[6..splice_descriptor_end]),
+                0x02 => Self::parse_segmentation_descriptor(&buf[6..splice_descriptor_end]),
+                0x03 => SpliceDescriptor::TimeDescriptor {
+                    tai_seconds: u64::from(buf[6]) << 40
+                        | u64::from(buf[7]) << 32
+                        | u64::from(buf[8]) << 24
+                        | u64::from(buf[9]) << 16
+                        | u64::from(buf[10]) << 8
+                        | u64::from(buf[11]),
+                    tai_nanoseconds:  u32::from(buf[12]) << 24
+                        | u32::from(buf[13]) << 16
+                        | u32::from(buf[14]) << 8
+                        | u32::from(buf[15]),
+                    utc_offset: u16::from(buf[16]) << 8
+                        | u16::from(buf[17])
+                },
                 _ => SpliceDescriptor::Reserved {
                     tag: splice_descriptor_tag,
                     identifier: [id[0], id[1], id[2], id[3]],
@@ -376,6 +715,7 @@ where
                 SpliceCommandType::SpliceNull => Some(Self::splice_null(payload)),
                 SpliceCommandType::SpliceInsert => Some(Self::splice_insert(payload)),
                 SpliceCommandType::TimeSignal => Some(Self::time_signal(payload)),
+                SpliceCommandType::BandwidthReservation => Some(Self::bandwidth_reservation(payload)),
                 _ => None,
             };
             if let Some(splice_command) = splice_command {
@@ -446,6 +786,11 @@ where
         };
         assert_eq!(r.position() as usize, payload.len() * 8);
         result
+    }
+
+    fn bandwidth_reservation(payload: &[u8]) -> SpliceCommand {
+        assert_eq!(0, payload.len());
+        SpliceCommand::BandwidthReservation {}
     }
 
     fn read_splice_detail(
@@ -617,6 +962,30 @@ mod tests {
                 tag: 01,
                 identifier: [0x4D, 0x59, 0x49, 0x44],
                 private_bytes: _,
+            })
+        );
+
+        let data = hex!("020f43554549000000017fbf0000100101");
+        assert_matches!(
+            SpliceDescriptor::parse(&data[..]),
+            Ok(SpliceDescriptor::SegmentationDescriptor {
+                segmentation_event_id: 1,
+                descriptor_detail: SegmentationDescriptor::Insert {
+                    program_segmentation_flag: true,
+                    segmentation_duration_flag: false,
+                    delivery_not_restricted_flag: true,
+                    delivery_restrictions: DeliveryRestrictionFlags::None,
+                    segmentation_mode: SegmentationMode::Program,
+                    segmentation_duration: None,
+                    segmentation_upid_type: SegmentationUpidType::NotUsed,
+                    segmentation_upid_length: 0,
+                    segmentation_upid: SegmentationUpid::None,
+                    segmentation_type_id: SegmentationTypeId::ProgramStart,
+                    segment_num: 1,
+                    segments_expected: 1,
+                    sub_segment_num: 0,
+                    sub_segments_expected: 0
+                }
             })
         );
     }
