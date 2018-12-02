@@ -114,13 +114,14 @@ impl<'a> SpliceInfoHeader<'a> {
 }
 impl<'a> fmt::Debug for SpliceInfoHeader<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "SpliceInfoHeader {{ protocol_version: {:?}, encrypted_packet: {:?}, encryption_algorithm: {:?}, pts_adjustment: {:?}, cw_index: {:?}, tier: {:?} }}",
-               self.protocol_version(),
-               self.encrypted_packet(),
-               self.encryption_algorithm(),
-               self.pts_adjustment(),
-               self.cw_index(),
-               self.tier())
+        f.debug_struct("SpliceInfoHeader")
+            .field("protocol_version", &self.protocol_version())
+            .field("encrypted_packet", &self.encrypted_packet())
+            .field("encryption_algorithm", &self.encryption_algorithm())
+            .field("pts_adjustment", &self.pts_adjustment())
+            .field("cw_index", &self.cw_index())
+            .field("tier", &self.tier())
+            .finish()
     }
 }
 
