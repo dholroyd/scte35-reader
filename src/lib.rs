@@ -106,7 +106,7 @@ impl<'a> SpliceInfoHeader<'a> {
         u16::from(self.buf[7]) << 4 | u16::from(self.buf[8]) >> 4
     }
     pub fn splice_command_length(&self) -> u16 {
-        u16::from(self.buf[8] & 0b00001111) << 8 | u16::from(self.buf[9])
+        u16::from(self.buf[8] & 0b0000_1111) << 8 | u16::from(self.buf[9])
     }
     pub fn splice_command_type(&self) -> SpliceCommandType {
         SpliceCommandType::from_id(self.buf[10])
@@ -450,8 +450,7 @@ impl SpliceDescriptor {
                 delivery_restrictions = DeliveryRestrictionFlags::None;
                 r.skip(5).unwrap();
             }
-            let segmentation_mode;
-            if !program_segmentation_flag {
+            let segmentation_mode = if !program_segmentation_flag {
                 let component_count = r.read_u8(8).unwrap();
                 let mut components = Vec::with_capacity(component_count as usize);
 
@@ -460,70 +459,64 @@ impl SpliceDescriptor {
                     r.skip(7).unwrap();
                     let pts_offset = r.read_u64(33).unwrap();
                     components.push(SegmentationModeComponent {
-                        component_tag: component_tag,
-                        pts_offset: pts_offset
+                        component_tag,
+                        pts_offset,
                     })
                 }
 
-                segmentation_mode = SegmentationMode::Component {
-                    components: components
-                };
+                SegmentationMode::Component {
+                    components
+                }
             } else {
-                segmentation_mode = SegmentationMode::Program;
-            }
+                SegmentationMode::Program
+            };
 
-            let duration;
-            if segmentation_duration_flag {
-                duration = Some(r.read_u64(40).unwrap());
+            let segmentation_duration = if segmentation_duration_flag {
+                Some(r.read_u64(40).unwrap())
             } else {
-                duration = None;
-            }
+                None
+            };
 
             let segmentation_upid_type = SegmentationUpidType::from_type(r.read_u8(8).unwrap());
             let segmentation_upid_length = r.read_u8(8).unwrap();
-            let segmentation_upid;
-            if segmentation_upid_length > 0 {
+            let segmentation_upid = if segmentation_upid_length > 0 {
                 let mut upid = Vec::with_capacity(segmentation_upid_length as usize);
                 for _i in 0..segmentation_upid_length - 1 {
                     upid.push(r.read_u8(8).unwrap());
                 }
-                segmentation_upid = SegmentationUpid::SegmentationUpid {
+                SegmentationUpid::SegmentationUpid {
                     upid
-                };
+                }
             } else {
-                segmentation_upid = SegmentationUpid::None;
-            }
+                SegmentationUpid::None
+            };
 
             let segmentation_type_id = SegmentationTypeId::from_id(r.read_u8(8).unwrap());
             let segment_num = r.read_u8(8).unwrap();
             let segments_expected = r.read_u8(8).unwrap();
 
-            let sub_segment_num;
-            let sub_segments_expected;
-            if segmentation_type_id == SegmentationTypeId::ProviderPlacementOpportunityStart
+            let (sub_segment_num, sub_segments_expected) = if segmentation_type_id == SegmentationTypeId::ProviderPlacementOpportunityStart
                 || segmentation_type_id == SegmentationTypeId::DistributorPlacementOpportunityStart {
-                sub_segment_num = r.read_u8(8).unwrap();
-                sub_segments_expected = r.read_u8(8).unwrap();
+                (r.read_u8(8).unwrap(), r.read_u8(8).unwrap())
             } else {
-                sub_segment_num = 0;
-                sub_segments_expected = 0;
-            }
+                (0, 0)
+            };
 
             SegmentationDescriptor::Insert {
-                program_segmentation_flag: program_segmentation_flag,
-                segmentation_duration_flag: segmentation_duration_flag,
-                delivery_not_restricted_flag: delivery_not_restricted_flag,
-                delivery_restrictions: delivery_restrictions,
-                segmentation_mode: segmentation_mode,
-                segmentation_duration: duration,
-                segmentation_upid_type: segmentation_upid_type,
-                segmentation_upid_length: segmentation_upid_length,
-                segmentation_upid: segmentation_upid,
-                segmentation_type_id: segmentation_type_id,
-                segment_num: segment_num,
-                segments_expected: segments_expected,
-                sub_segment_num: sub_segment_num,
-                sub_segments_expected: sub_segments_expected
+                program_segmentation_flag,
+                segmentation_duration_flag,
+                delivery_not_restricted_flag,
+                delivery_restrictions,
+                segmentation_mode,
+                segmentation_duration,
+                segmentation_upid_type,
+                segmentation_upid_length,
+                segmentation_upid,
+                segmentation_type_id,
+                segment_num,
+                segments_expected,
+                sub_segment_num,
+                sub_segments_expected
             }
         }
     }
@@ -554,8 +547,8 @@ impl SpliceDescriptor {
         }
         assert_eq!(r.position() as usize, buf.len() * 8);
         SpliceDescriptor::DTMFDescriptor {
-            preroll: preroll,
-            dtmf_chars: dtmf_chars
+            preroll,
+            dtmf_chars
         }
     }
     fn parse(buf: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
@@ -657,7 +650,7 @@ impl<'buf> Iterator for SpliceDescriptorIter<'buf> {
                 descriptor_length,
             )));
         }
-        let (desc, rest) = self.buf.split_at(usize::from(2 + descriptor_length));
+        let (desc, rest) = self.buf.split_at(2 + descriptor_length);
         let result = SpliceDescriptor::parse(desc);
         self.buf = rest;
         Some(result)
