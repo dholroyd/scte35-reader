@@ -134,9 +134,9 @@ pub enum SpliceCommand {
         splice_detail: SpliceInsert,
     },
     TimeSignal {
-        splice_time: SpliceTime
+        splice_time: SpliceTime,
     },
-    BandwidthReservation {}
+    BandwidthReservation {},
 }
 
 #[derive(Debug)]
@@ -222,7 +222,7 @@ pub enum SegmentationUpidType {
     MID,
     ADS,
     URI,
-    Reserved(u8)
+    Reserved(u8),
 }
 impl SegmentationUpidType {
     pub fn from_type(id: u8) -> SegmentationUpidType {
@@ -243,7 +243,7 @@ impl SegmentationUpidType {
             13 => SegmentationUpidType::MID,
             14 => SegmentationUpidType::ADS,
             15 => SegmentationUpidType::URI,
-            _ => SegmentationUpidType::Reserved(id)
+            _ => SegmentationUpidType::Reserved(id),
         }
     }
 }
@@ -278,7 +278,7 @@ pub enum SegmentationTypeId {
     UnscheduledEventEnd,
     NetworkStart,
     NetworkEnd,
-    Reserved(u8)
+    Reserved(u8),
 }
 impl SegmentationTypeId {
     pub fn from_id(id: u8) -> SegmentationTypeId {
@@ -311,7 +311,7 @@ impl SegmentationTypeId {
             65 => SegmentationTypeId::UnscheduledEventEnd,
             80 => SegmentationTypeId::NetworkStart,
             81 => SegmentationTypeId::NetworkEnd,
-            _ => SegmentationTypeId::Reserved(id)
+            _ => SegmentationTypeId::Reserved(id),
         }
     }
 }
@@ -319,9 +319,7 @@ impl SegmentationTypeId {
 #[derive(Debug)]
 pub enum SegmentationUpid {
     None,
-    SegmentationUpid {
-        upid: Vec<u8>
-    }
+    SegmentationUpid { upid: Vec<u8> },
 }
 
 #[derive(Debug)]
@@ -329,7 +327,7 @@ pub enum DeviceRestrictions {
     RestrictGroup0,
     RestrictGroup1,
     RestrictGroup2,
-    None
+    None,
 }
 impl DeviceRestrictions {
     /// panics if `id` is something other than `0` or `1`
@@ -341,7 +339,8 @@ impl DeviceRestrictions {
             3 => DeviceRestrictions::None,
             _ => panic!(
                 "Invalid device_restrictions value: {} (expected 0, 1, 2, 3)",
-            restriction),
+                restriction
+            ),
         }
     }
 }
@@ -353,22 +352,22 @@ pub enum DeliveryRestrictionFlags {
         web_delivery_allowed_flag: bool,
         no_regional_blackout_flag: bool,
         archive_allowed_flag: bool,
-        device_restrictions: DeviceRestrictions
-    }
+        device_restrictions: DeviceRestrictions,
+    },
 }
 
 #[derive(Debug)]
 pub enum SegmentationMode {
     Program,
     Component {
-        components: Vec<SegmentationModeComponent>
-    }
+        components: Vec<SegmentationModeComponent>,
+    },
 }
 
 #[derive(Debug)]
 pub struct SegmentationModeComponent {
     component_tag: u8,
-    pts_offset: u64
+    pts_offset: u64,
 }
 
 #[derive(Debug)]
@@ -414,7 +413,7 @@ pub enum SpliceDescriptor {
     },
     DTMFDescriptor {
         preroll: u8,
-        dtmf_chars: Vec<u8>
+        dtmf_chars: Vec<u8>,
     },
     SegmentationDescriptor {
         segmentation_event_id: u32,
@@ -423,7 +422,7 @@ pub enum SpliceDescriptor {
     TimeDescriptor {
         tai_seconds: u64,
         tai_nanoseconds: u32,
-        utc_offset: u16
+        utc_offset: u16,
     },
     Reserved {
         tag: u8,
@@ -432,7 +431,10 @@ pub enum SpliceDescriptor {
     },
 }
 impl SpliceDescriptor {
-    fn parse_segmentation_descriptor_details(r: &mut bitreader::BitReader, cancelled: bool) -> SegmentationDescriptor {
+    fn parse_segmentation_descriptor_details(
+        r: &mut bitreader::BitReader,
+        cancelled: bool,
+    ) -> SegmentationDescriptor {
         if cancelled {
             SegmentationDescriptor::Cancel
         } else {
@@ -445,7 +447,7 @@ impl SpliceDescriptor {
                     web_delivery_allowed_flag: r.read_bool().unwrap(),
                     no_regional_blackout_flag: r.read_bool().unwrap(),
                     archive_allowed_flag: r.read_bool().unwrap(),
-                    device_restrictions: DeviceRestrictions::from_bits(r.read_u8(2).unwrap())
+                    device_restrictions: DeviceRestrictions::from_bits(r.read_u8(2).unwrap()),
                 }
             } else {
                 delivery_restrictions = DeliveryRestrictionFlags::None;
@@ -465,9 +467,7 @@ impl SpliceDescriptor {
                     })
                 }
 
-                SegmentationMode::Component {
-                    components
-                }
+                SegmentationMode::Component { components }
             } else {
                 SegmentationMode::Program
             };
@@ -485,9 +485,7 @@ impl SpliceDescriptor {
                 for _i in 0..segmentation_upid_length - 1 {
                     upid.push(r.read_u8(8).unwrap());
                 }
-                SegmentationUpid::SegmentationUpid {
-                    upid
-                }
+                SegmentationUpid::SegmentationUpid { upid }
             } else {
                 SegmentationUpid::None
             };
@@ -496,8 +494,10 @@ impl SpliceDescriptor {
             let segment_num = r.read_u8(8).unwrap();
             let segments_expected = r.read_u8(8).unwrap();
 
-            let (sub_segment_num, sub_segments_expected) = if segmentation_type_id == SegmentationTypeId::ProviderPlacementOpportunityStart
-                || segmentation_type_id == SegmentationTypeId::DistributorPlacementOpportunityStart {
+            let (sub_segment_num, sub_segments_expected) = if segmentation_type_id
+                == SegmentationTypeId::ProviderPlacementOpportunityStart
+                || segmentation_type_id == SegmentationTypeId::DistributorPlacementOpportunityStart
+            {
                 (r.read_u8(8).unwrap(), r.read_u8(8).unwrap())
             } else {
                 (0, 0)
@@ -517,7 +517,7 @@ impl SpliceDescriptor {
                 segment_num,
                 segments_expected,
                 sub_segment_num,
-                sub_segments_expected
+                sub_segments_expected,
             }
         }
     }
@@ -530,7 +530,7 @@ impl SpliceDescriptor {
 
         let result = SpliceDescriptor::SegmentationDescriptor {
             segmentation_event_id: id,
-            descriptor_detail: Self::parse_segmentation_descriptor_details(&mut r, cancel)
+            descriptor_detail: Self::parse_segmentation_descriptor_details(&mut r, cancel),
         };
 
         assert_eq!(r.position() as usize, buf.len() * 8);
@@ -549,7 +549,7 @@ impl SpliceDescriptor {
         assert_eq!(r.position() as usize, buf.len() * 8);
         SpliceDescriptor::DTMFDescriptor {
             preroll,
-            dtmf_chars
+            dtmf_chars,
         }
     }
     fn parse(buf: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
@@ -592,12 +592,11 @@ impl SpliceDescriptor {
                         | u64::from(buf[9]) << 16
                         | u64::from(buf[10]) << 8
                         | u64::from(buf[11]),
-                    tai_nanoseconds:  u32::from(buf[12]) << 24
+                    tai_nanoseconds: u32::from(buf[12]) << 24
                         | u32::from(buf[13]) << 16
                         | u32::from(buf[14]) << 8
                         | u32::from(buf[15]),
-                    utc_offset: u16::from(buf[16]) << 8
-                        | u16::from(buf[17])
+                    utc_offset: u16::from(buf[16]) << 8 | u16::from(buf[17]),
                 },
                 _ => SpliceDescriptor::Reserved {
                     tag: splice_descriptor_tag,
@@ -711,7 +710,9 @@ where
                 SpliceCommandType::SpliceNull => Some(Self::splice_null(payload)),
                 SpliceCommandType::SpliceInsert => Some(Self::splice_insert(payload)),
                 SpliceCommandType::TimeSignal => Some(Self::time_signal(payload)),
-                SpliceCommandType::BandwidthReservation => Some(Self::bandwidth_reservation(payload)),
+                SpliceCommandType::BandwidthReservation => {
+                    Some(Self::bandwidth_reservation(payload))
+                }
                 _ => None,
             };
             if let Some(splice_command) = splice_command {
@@ -778,7 +779,7 @@ where
         let mut r = bitreader::BitReader::new(payload);
 
         let result = SpliceCommand::TimeSignal {
-            splice_time: SpliceTime::Timed(Self::read_splice_time(&mut r))
+            splice_time: SpliceTime::Timed(Self::read_splice_time(&mut r)),
         };
         assert_eq!(r.position() as usize, payload.len() * 8);
         result
