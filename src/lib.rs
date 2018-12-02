@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 #[cfg(test)]
 #[macro_use]
 extern crate mpeg2ts_reader;
