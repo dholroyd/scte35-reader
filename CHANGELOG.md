@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 ### Changed
  - Made most methods return `Result`, and remove all explicit `unwrap()` calls from within
  - Bumped `mpeg2ts-reader` to latest 0.7.0 release
