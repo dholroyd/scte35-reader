@@ -2,7 +2,8 @@
 
 ## Unreleased
 ### Added
- - Support for `time_signal()` messages - thanks to [@davemevans](https://github.com/davemevans)!
+ - Support for `time_signal()` and `bandwidth_reservation()` messages, plus `DTMF_descriptor`,
+   `segmentation_descriptor` and `time_descriptor` - huge thanks to [@davemevans](https://github.com/davemevans)!
 
 ## 0.5.0
 ### Changed
