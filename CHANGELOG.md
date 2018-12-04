@@ -3,6 +3,7 @@
 ## Unreleased
 ### Changed
  - Made most methods return `Result`, and remove all explicit `unwrap()` calls from within
+ - Bumped `mpeg2ts-reader` to latest 0.7.0 release
 
 ### Added
  - Support for `time_signal()` and `bandwidth_reservation()` messages, plus `DTMF_descriptor`,
