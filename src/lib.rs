@@ -434,33 +434,33 @@ impl SpliceDescriptor {
     fn parse_segmentation_descriptor_details(
         r: &mut bitreader::BitReader,
         cancelled: bool,
-    ) -> SegmentationDescriptor {
+    ) -> Result<SegmentationDescriptor, SpliceDescriptorErr> {
         if cancelled {
-            SegmentationDescriptor::Cancel
+            Ok(SegmentationDescriptor::Cancel)
         } else {
-            let program_segmentation_flag = r.read_bool().unwrap();
-            let segmentation_duration_flag = r.read_bool().unwrap();
-            let delivery_not_restricted_flag = r.read_bool().unwrap();
+            let program_segmentation_flag = r.read_bool()?;
+            let segmentation_duration_flag = r.read_bool()?;
+            let delivery_not_restricted_flag = r.read_bool()?;
             let delivery_restrictions;
             if !delivery_not_restricted_flag {
                 delivery_restrictions = DeliveryRestrictionFlags::DeliveryRestrictions {
-                    web_delivery_allowed_flag: r.read_bool().unwrap(),
-                    no_regional_blackout_flag: r.read_bool().unwrap(),
-                    archive_allowed_flag: r.read_bool().unwrap(),
-                    device_restrictions: DeviceRestrictions::from_bits(r.read_u8(2).unwrap()),
+                    web_delivery_allowed_flag: r.read_bool()?,
+                    no_regional_blackout_flag: r.read_bool()?,
+                    archive_allowed_flag: r.read_bool()?,
+                    device_restrictions: DeviceRestrictions::from_bits(r.read_u8(2)?),
                 }
             } else {
                 delivery_restrictions = DeliveryRestrictionFlags::None;
-                r.skip(5).unwrap();
+                r.skip(5)?;
             }
             let segmentation_mode = if !program_segmentation_flag {
-                let component_count = r.read_u8(8).unwrap();
+                let component_count = r.read_u8(8)?;
                 let mut components = Vec::with_capacity(component_count as usize);
 
                 for _i in 0..component_count - 1 {
-                    let component_tag = r.read_u8(8).unwrap();
-                    r.skip(7).unwrap();
-                    let pts_offset = r.read_u64(33).unwrap();
+                    let component_tag = r.read_u8(8)?;
+                    r.skip(7)?;
+                    let pts_offset = r.read_u64(33)?;
                     components.push(SegmentationModeComponent {
                         component_tag,
                         pts_offset,
@@ -473,37 +473,37 @@ impl SpliceDescriptor {
             };
 
             let segmentation_duration = if segmentation_duration_flag {
-                Some(r.read_u64(40).unwrap())
+                Some(r.read_u64(40)?)
             } else {
                 None
             };
 
-            let segmentation_upid_type = SegmentationUpidType::from_type(r.read_u8(8).unwrap());
-            let segmentation_upid_length = r.read_u8(8).unwrap();
+            let segmentation_upid_type = SegmentationUpidType::from_type(r.read_u8(8)?);
+            let segmentation_upid_length = r.read_u8(8)?;
             let segmentation_upid = if segmentation_upid_length > 0 {
                 let mut upid = Vec::with_capacity(segmentation_upid_length as usize);
                 for _i in 0..segmentation_upid_length - 1 {
-                    upid.push(r.read_u8(8).unwrap());
+                    upid.push(r.read_u8(8)?);
                 }
                 SegmentationUpid::SegmentationUpid { upid }
             } else {
                 SegmentationUpid::None
             };
 
-            let segmentation_type_id = SegmentationTypeId::from_id(r.read_u8(8).unwrap());
-            let segment_num = r.read_u8(8).unwrap();
-            let segments_expected = r.read_u8(8).unwrap();
+            let segmentation_type_id = SegmentationTypeId::from_id(r.read_u8(8)?);
+            let segment_num = r.read_u8(8)?;
+            let segments_expected = r.read_u8(8)?;
 
             let (sub_segment_num, sub_segments_expected) = if segmentation_type_id
                 == SegmentationTypeId::ProviderPlacementOpportunityStart
                 || segmentation_type_id == SegmentationTypeId::DistributorPlacementOpportunityStart
             {
-                (r.read_u8(8).unwrap(), r.read_u8(8).unwrap())
+                (r.read_u8(8)?, r.read_u8(8)?)
             } else {
                 (0, 0)
             };
 
-            SegmentationDescriptor::Insert {
+            Ok(SegmentationDescriptor::Insert {
                 program_segmentation_flag,
                 segmentation_duration_flag,
                 delivery_not_restricted_flag,
@@ -518,39 +518,39 @@ impl SpliceDescriptor {
                 segments_expected,
                 sub_segment_num,
                 sub_segments_expected,
-            }
+            })
         }
     }
 
-    fn parse_segmentation_descriptor(buf: &[u8]) -> SpliceDescriptor {
+    fn parse_segmentation_descriptor(buf: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
         let mut r = bitreader::BitReader::new(buf);
-        let id = r.read_u32(32).unwrap();
-        let cancel = r.read_bool().unwrap();
-        r.skip(7).unwrap();
+        let id = r.read_u32(32)?;
+        let cancel = r.read_bool()?;
+        r.skip(7)?;
 
         let result = SpliceDescriptor::SegmentationDescriptor {
             segmentation_event_id: id,
-            descriptor_detail: Self::parse_segmentation_descriptor_details(&mut r, cancel),
+            descriptor_detail: Self::parse_segmentation_descriptor_details(&mut r, cancel)?,
         };
 
         assert_eq!(r.position() as usize, buf.len() * 8);
-        result
+        Ok(result)
     }
 
-    fn parse_dtmf_descriptor(buf: &[u8]) -> SpliceDescriptor {
+    fn parse_dtmf_descriptor(buf: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
         let mut r = bitreader::BitReader::new(buf);
-        let preroll = r.read_u8(8).unwrap();
-        let dtmf_count = r.read_u8(3).unwrap();
-        r.skip(5).unwrap();
+        let preroll = r.read_u8(8)?;
+        let dtmf_count = r.read_u8(3)?;
+        r.skip(5)?;
         let mut dtmf_chars = Vec::with_capacity(dtmf_count as usize);
         for _i in 0..dtmf_count - 1 {
-            dtmf_chars.push(r.read_u8(8).unwrap())
+            dtmf_chars.push(r.read_u8(8)?)
         }
         assert_eq!(r.position() as usize, buf.len() * 8);
-        SpliceDescriptor::DTMFDescriptor {
+        Ok(SpliceDescriptor::DTMFDescriptor {
             preroll,
             dtmf_chars,
-        }
+        })
     }
     fn parse(buf: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
         if buf.len() < 6 {
@@ -583,8 +583,8 @@ impl SpliceDescriptor {
                         | u32::from(buf[8]) << 8
                         | u32::from(buf[9]),
                 },
-                0x01 => Self::parse_dtmf_descriptor(&buf[6..splice_descriptor_end]),
-                0x02 => Self::parse_segmentation_descriptor(&buf[6..splice_descriptor_end]),
+                0x01 => Self::parse_dtmf_descriptor(&buf[6..splice_descriptor_end])?,
+                0x02 => Self::parse_segmentation_descriptor(&buf[6..splice_descriptor_end])?,
                 0x03 => SpliceDescriptor::TimeDescriptor {
                     tai_seconds: u64::from(buf[6]) << 40
                         | u64::from(buf[7]) << 32
@@ -612,6 +612,22 @@ impl SpliceDescriptor {
 pub enum SpliceDescriptorErr {
     InvalidDescriptorLength(usize),
     NotEnoughData { expected: usize, actual: usize },
+}
+impl From<bitreader::BitReaderError> for SpliceDescriptorErr {
+    fn from(e: bitreader::BitReaderError) -> Self {
+        match e {
+            bitreader::BitReaderError::NotEnoughData { position, length, requested } => {
+                // TODO: round numbers up to nearest byte,
+                SpliceDescriptorErr::NotEnoughData {
+                    expected: (requested / 8) as usize,
+                    actual: ((length - position) / 8) as usize
+                }
+            },
+            bitreader::BitReaderError::TooManyBitsForType {..} => {
+                panic!("scte35-reader bug: {:?}", e)
+            },
+        }
+    }
 }
 
 pub struct SpliceDescriptorIter<'buf> {
@@ -715,17 +731,23 @@ where
                 }
                 _ => None,
             };
-            if let Some(splice_command) = splice_command {
-                self.processor.process(
-                    splice_header,
-                    splice_command,
-                    SpliceDescriptorIter::new(descriptors),
-                );
-            } else {
-                println!(
-                    "SCTE35: unhandled command {:?}",
-                    splice_header.splice_command_type()
-                );
+            match splice_command {
+                Some(Ok(splice_command)) => {
+                    self.processor.process(
+                        splice_header,
+                        splice_command,
+                        SpliceDescriptorIter::new(descriptors),
+                    );
+                },
+                Some(Err(e)) => {
+                    println!("SCTE35: parse error: {:?}", e);
+                },
+                None => {
+                    println!(
+                        "SCTE35: unhandled command {:?}",
+                        splice_header.splice_command_type()
+                    );
+                }
             }
         } else {
             println!(
@@ -747,74 +769,78 @@ impl<P, Ctx: demultiplex::DemuxContext> Scte35SectionProcessor<P, Ctx>
 where
     P: SpliceInfoProcessor,
 {
-    // FIXME: get rid of all unwrap()
-
     pub fn new(processor: P) -> Scte35SectionProcessor<P, Ctx> {
         Scte35SectionProcessor {
             processor,
             phantom: marker::PhantomData,
         }
     }
-    fn splice_null(payload: &[u8]) -> SpliceCommand {
-        assert_eq!(0, payload.len());
-        SpliceCommand::SpliceNull {}
+    fn splice_null(payload: &[u8]) -> Result<SpliceCommand, SpliceDescriptorErr> {
+        if 0 == payload.len() {
+            Ok(SpliceCommand::SpliceNull {})
+        } else {
+            Err(SpliceDescriptorErr::InvalidDescriptorLength(payload.len()))
+        }
     }
 
-    fn splice_insert(payload: &[u8]) -> SpliceCommand {
+    fn splice_insert(payload: &[u8]) -> Result<SpliceCommand, SpliceDescriptorErr> {
         let mut r = bitreader::BitReader::new(payload);
 
-        let splice_event_id = r.read_u32(32).unwrap();
-        let splice_event_cancel_indicator = r.read_bool().unwrap();
-        let reserved = r.read_u8(7).unwrap();
+        let splice_event_id = r.read_u32(32)?;
+        let splice_event_cancel_indicator = r.read_bool()?;
+        let reserved = r.read_u8(7)?;
         let result = SpliceCommand::SpliceInsert {
             splice_event_id,
             reserved,
-            splice_detail: Self::read_splice_detail(&mut r, splice_event_cancel_indicator),
+            splice_detail: Self::read_splice_detail(&mut r, splice_event_cancel_indicator)?,
         };
         assert_eq!(r.position() as usize, payload.len() * 8);
-        result
+        Ok(result)
     }
 
-    fn time_signal(payload: &[u8]) -> SpliceCommand {
+    fn time_signal(payload: &[u8]) -> Result<SpliceCommand, SpliceDescriptorErr> {
         let mut r = bitreader::BitReader::new(payload);
 
         let result = SpliceCommand::TimeSignal {
-            splice_time: SpliceTime::Timed(Self::read_splice_time(&mut r)),
+            splice_time: SpliceTime::Timed(Self::read_splice_time(&mut r)?),
         };
         assert_eq!(r.position() as usize, payload.len() * 8);
-        result
+        Ok(result)
     }
 
-    fn bandwidth_reservation(payload: &[u8]) -> SpliceCommand {
-        assert_eq!(0, payload.len());
-        SpliceCommand::BandwidthReservation {}
+    fn bandwidth_reservation(payload: &[u8]) -> Result<SpliceCommand, SpliceDescriptorErr> {
+        if 0 == payload.len() {
+            Ok(SpliceCommand::BandwidthReservation {})
+        } else {
+            Err(SpliceDescriptorErr::InvalidDescriptorLength(payload.len()))
+        }
     }
 
     fn read_splice_detail(
         r: &mut bitreader::BitReader,
         splice_event_cancel_indicator: bool,
-    ) -> SpliceInsert {
+    ) -> Result<SpliceInsert, SpliceDescriptorErr> {
         if splice_event_cancel_indicator {
-            SpliceInsert::Cancel
+            Ok(SpliceInsert::Cancel)
         } else {
-            let network_indicator = NetworkIndicator::from_flag(r.read_u8(1).unwrap());
-            let program_splice_flag = r.read_bool().unwrap();
-            let duration_flag = r.read_bool().unwrap();
-            let splice_immediate_flag = r.read_bool().unwrap();
-            r.skip(4).unwrap(); // reserved
+            let network_indicator = NetworkIndicator::from_flag(r.read_u8(1)?);
+            let program_splice_flag = r.read_bool()?;
+            let duration_flag = r.read_bool()?;
+            let splice_immediate_flag = r.read_bool()?;
+            r.skip(4)?; // reserved
 
-            SpliceInsert::Insert {
+            Ok(SpliceInsert::Insert {
                 network_indicator,
-                splice_mode: Self::read_splice_mode(r, program_splice_flag, splice_immediate_flag),
+                splice_mode: Self::read_splice_mode(r, program_splice_flag, splice_immediate_flag)?,
                 duration: if duration_flag {
-                    Some(Self::read_duration(r))
+                    Some(Self::read_duration(r)?)
                 } else {
                     None
                 },
-                unique_program_id: r.read_u16(16).unwrap(),
-                avail_num: r.read_u8(8).unwrap(),
-                avails_expected: r.read_u8(8).unwrap(),
-            }
+                unique_program_id: r.read_u16(16)?,
+                avail_num: r.read_u8(8)?,
+                avails_expected: r.read_u8(8)?,
+            })
         }
     }
 
@@ -822,50 +848,50 @@ where
         r: &mut bitreader::BitReader,
         program_splice_flag: bool,
         splice_immediate_flag: bool,
-    ) -> SpliceMode {
+    ) -> Result<SpliceMode, SpliceDescriptorErr> {
         if program_splice_flag {
             let time = if splice_immediate_flag {
                 SpliceTime::Immediate
             } else {
-                SpliceTime::Timed(Self::read_splice_time(r))
+                SpliceTime::Timed(Self::read_splice_time(r)?)
             };
-            SpliceMode::Program(time)
+            Ok(SpliceMode::Program(time))
         } else {
-            let component_count = r.read_u8(8).unwrap();
-            let compomemts = (0..component_count)
-                .map(|_| {
-                    let component_tag = r.read_u8(8).unwrap();
-                    let splice_time = if splice_immediate_flag {
-                        SpliceTime::Immediate
-                    } else {
-                        SpliceTime::Timed(Self::read_splice_time(r))
-                    };
-                    ComponentSplice {
-                        component_tag,
-                        splice_time,
-                    }
-                }).collect();
-            SpliceMode::Components(compomemts)
+            let component_count = r.read_u8(8)? as usize;
+            let mut components = Vec::with_capacity(component_count);
+            for _ in 0..component_count {
+                let component_tag = r.read_u8(8)?;
+                let splice_time = if splice_immediate_flag {
+                    SpliceTime::Immediate
+                } else {
+                    SpliceTime::Timed(Self::read_splice_time(r)?)
+                };
+                components.push(ComponentSplice {
+                    component_tag,
+                    splice_time,
+                });
+            }
+            Ok(SpliceMode::Components(components))
         }
     }
 
-    fn read_splice_time(r: &mut bitreader::BitReader) -> Option<u64> {
-        if r.read_bool().unwrap_or(false) {
-            r.skip(6).unwrap(); // reserved
-            r.read_u64(33).ok()
+    fn read_splice_time(r: &mut bitreader::BitReader) -> Result<Option<u64>, SpliceDescriptorErr> {
+        Ok(if r.read_bool()? {
+            r.skip(6)?; // reserved
+            Some(r.read_u64(33)?)
         } else {
-            r.skip(7).unwrap(); // reserved
+            r.skip(7)?; // reserved
             None
-        }
+        })
     }
 
-    fn read_duration(r: &mut bitreader::BitReader) -> SpliceDuration {
-        let return_mode = ReturnMode::from_flag(r.read_u8(1).unwrap());
-        r.skip(6).unwrap();
-        SpliceDuration {
+    fn read_duration(r: &mut bitreader::BitReader) -> Result<SpliceDuration, SpliceDescriptorErr> {
+        let return_mode = ReturnMode::from_flag(r.read_u8(1)?);
+        r.skip(6)?;
+        Ok(SpliceDuration {
             return_mode,
-            duration: r.read_u64(33).unwrap(),
-        }
+            duration: r.read_u64(33)?,
+        })
     }
 }
 

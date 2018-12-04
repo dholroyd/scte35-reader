@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+### Changed
+ - Made most methods return `Result`, and remove all explicit `unwrap()` calls from within
+
 ### Added
  - Support for `time_signal()` and `bandwidth_reservation()` messages, plus `DTMF_descriptor`,
    `segmentation_descriptor` and `time_descriptor` - huge thanks to [@davemevans](https://github.com/davemevans)!
