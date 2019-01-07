@@ -18,6 +18,22 @@ use mpeg2ts_reader::psi;
 use std::fmt;
 use std::marker;
 
+/// Utility function to search the PTM section for a `CUEI` registration descriptor per
+/// _SCTE-35, section 8.1_, which indicates that streams with `stream_type` equal to the private
+/// value `0x86` within this PMT section are formatted according to SCTE-35.
+///
+/// Returns `true` if the descriptor is attached to the given PMT section and `false` otherwise.
+pub fn is_scte35(pmt: &mpeg2ts_reader::psi::pmt::PmtSection) -> bool {
+    for d in pmt.descriptors() {
+        if let Ok(mpeg2ts_reader::descriptor::CoreDescriptors::Registration(
+            mpeg2ts_reader::descriptor::registration::RegistrationDescriptor { buf: b"CUEI" },
+        )) = d
+        {
+            return true;
+        }
+    }
+    false
+}
 #[derive(Debug, PartialEq)]
 pub enum EncryptionAlgorithm {
     None,
