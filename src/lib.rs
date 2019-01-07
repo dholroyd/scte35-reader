@@ -620,16 +620,20 @@ pub enum SpliceDescriptorErr {
 impl From<bitreader::BitReaderError> for SpliceDescriptorErr {
     fn from(e: bitreader::BitReaderError) -> Self {
         match e {
-            bitreader::BitReaderError::NotEnoughData { position, length, requested } => {
+            bitreader::BitReaderError::NotEnoughData {
+                position,
+                length,
+                requested,
+            } => {
                 // TODO: round numbers up to nearest byte,
                 SpliceDescriptorErr::NotEnoughData {
                     expected: (requested / 8) as usize,
-                    actual: ((length - position) / 8) as usize
+                    actual: ((length - position) / 8) as usize,
                 }
-            },
-            bitreader::BitReaderError::TooManyBitsForType {..} => {
+            }
+            bitreader::BitReaderError::TooManyBitsForType { .. } => {
                 panic!("scte35-reader bug: {:?}", e)
-            },
+            }
         }
     }
 }
@@ -742,10 +746,10 @@ where
                         splice_command,
                         SpliceDescriptorIter::new(descriptors),
                     );
-                },
+                }
                 Some(Err(e)) => {
                     println!("SCTE35: parse error: {:?}", e);
-                },
+                }
                 None => {
                     println!(
                         "SCTE35: unhandled command {:?}",
@@ -879,7 +883,9 @@ where
         }
     }
 
-    fn read_splice_time(r: &mut bitreader::BitReader<'_>) -> Result<Option<u64>, SpliceDescriptorErr> {
+    fn read_splice_time(
+        r: &mut bitreader::BitReader<'_>,
+    ) -> Result<Option<u64>, SpliceDescriptorErr> {
         Ok(if r.read_bool()? {
             r.skip(6)?; // reserved
             Some(r.read_u64(33)?)
@@ -889,7 +895,9 @@ where
         })
     }
 
-    fn read_duration(r: &mut bitreader::BitReader<'_>) -> Result<SpliceDuration, SpliceDescriptorErr> {
+    fn read_duration(
+        r: &mut bitreader::BitReader<'_>,
+    ) -> Result<SpliceDuration, SpliceDescriptorErr> {
         let return_mode = ReturnMode::from_flag(r.read_u8(1)?);
         r.skip(6)?;
         Ok(SpliceDuration {
@@ -902,11 +910,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hex_literal::*;
+    use matches::*;
     use mpeg2ts_reader::demultiplex;
     use mpeg2ts_reader::psi;
     use mpeg2ts_reader::psi::SectionProcessor;
-    use hex_literal::*;
-    use matches::*;
 
     mpeg2ts_reader::demux_context!(NullDemuxContext, NullStreamConstructor);
     pub struct NullStreamConstructor;
