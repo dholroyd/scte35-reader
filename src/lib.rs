@@ -1,18 +1,5 @@
 #![forbid(unsafe_code)]
 
-#[cfg(test)]
-#[macro_use]
-extern crate mpeg2ts_reader;
-extern crate bitreader;
-#[cfg(not(test))]
-extern crate mpeg2ts_reader;
-#[cfg(test)]
-#[macro_use]
-extern crate hex_literal;
-#[cfg(test)]
-#[macro_use]
-extern crate matches;
-
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
 use std::fmt;
@@ -917,8 +904,10 @@ mod tests {
     use mpeg2ts_reader::demultiplex;
     use mpeg2ts_reader::psi;
     use mpeg2ts_reader::psi::SectionProcessor;
+    use hex_literal::*;
+    use matches::*;
 
-    demux_context!(NullDemuxContext, NullStreamConstructor);
+    mpeg2ts_reader::demux_context!(NullDemuxContext, NullStreamConstructor);
     pub struct NullStreamConstructor;
     impl demultiplex::StreamConstructor for NullStreamConstructor {
         type F = demultiplex::NullPacketFilter<NullDemuxContext>;
