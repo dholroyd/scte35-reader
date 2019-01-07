@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![deny(rust_2018_idioms, future_incompatible)]
 
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
@@ -10,7 +11,7 @@ use std::marker;
 /// value `0x86` within this PMT section are formatted according to SCTE-35.
 ///
 /// Returns `true` if the descriptor is attached to the given PMT section and `false` otherwise.
-pub fn is_scte35(pmt: &mpeg2ts_reader::psi::pmt::PmtSection) -> bool {
+pub fn is_scte35(pmt: &mpeg2ts_reader::psi::pmt::PmtSection<'_>) -> bool {
     for d in pmt.descriptors() {
         if let Ok(mpeg2ts_reader::descriptor::CoreDescriptors::Registration(
             mpeg2ts_reader::descriptor::registration::RegistrationDescriptor { buf: b"CUEI" },
@@ -116,7 +117,7 @@ impl<'a> SpliceInfoHeader<'a> {
     }
 }
 impl<'a> fmt::Debug for SpliceInfoHeader<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("SpliceInfoHeader")
             .field("protocol_version", &self.protocol_version())
             .field("encrypted_packet", &self.encrypted_packet())
@@ -403,9 +404,9 @@ pub struct SpliceDuration {
 pub trait SpliceInfoProcessor {
     fn process(
         &self,
-        header: SpliceInfoHeader,
+        header: SpliceInfoHeader<'_>,
         command: SpliceCommand,
-        descriptors: SpliceDescriptorIter,
+        descriptors: SpliceDescriptorIter<'_>,
     );
 }
 
@@ -435,7 +436,7 @@ pub enum SpliceDescriptor {
 }
 impl SpliceDescriptor {
     fn parse_segmentation_descriptor_details(
-        r: &mut bitreader::BitReader,
+        r: &mut bitreader::BitReader<'_>,
         cancelled: bool,
     ) -> Result<SegmentationDescriptor, SpliceDescriptorErr> {
         if cancelled {
@@ -637,7 +638,7 @@ pub struct SpliceDescriptorIter<'buf> {
     buf: &'buf [u8],
 }
 impl<'buf> SpliceDescriptorIter<'buf> {
-    fn new(buf: &'buf [u8]) -> SpliceDescriptorIter {
+    fn new(buf: &'buf [u8]) -> SpliceDescriptorIter<'_> {
         SpliceDescriptorIter { buf }
     }
 }
@@ -820,7 +821,7 @@ where
     }
 
     fn read_splice_detail(
-        r: &mut bitreader::BitReader,
+        r: &mut bitreader::BitReader<'_>,
         splice_event_cancel_indicator: bool,
     ) -> Result<SpliceInsert, SpliceDescriptorErr> {
         if splice_event_cancel_indicator {
@@ -848,7 +849,7 @@ where
     }
 
     fn read_splice_mode(
-        r: &mut bitreader::BitReader,
+        r: &mut bitreader::BitReader<'_>,
         program_splice_flag: bool,
         splice_immediate_flag: bool,
     ) -> Result<SpliceMode, SpliceDescriptorErr> {
@@ -878,7 +879,7 @@ where
         }
     }
 
-    fn read_splice_time(r: &mut bitreader::BitReader) -> Result<Option<u64>, SpliceDescriptorErr> {
+    fn read_splice_time(r: &mut bitreader::BitReader<'_>) -> Result<Option<u64>, SpliceDescriptorErr> {
         Ok(if r.read_bool()? {
             r.skip(6)?; // reserved
             Some(r.read_u64(33)?)
@@ -888,7 +889,7 @@ where
         })
     }
 
-    fn read_duration(r: &mut bitreader::BitReader) -> Result<SpliceDuration, SpliceDescriptorErr> {
+    fn read_duration(r: &mut bitreader::BitReader<'_>) -> Result<SpliceDuration, SpliceDescriptorErr> {
         let return_mode = ReturnMode::from_flag(r.read_u8(1)?);
         r.skip(6)?;
         Ok(SpliceDuration {
@@ -912,7 +913,7 @@ mod tests {
     impl demultiplex::StreamConstructor for NullStreamConstructor {
         type F = demultiplex::NullPacketFilter<NullDemuxContext>;
 
-        fn construct(&mut self, _req: demultiplex::FilterRequest) -> Self::F {
+        fn construct(&mut self, _req: demultiplex::FilterRequest<'_, '_>) -> Self::F {
             unimplemented!();
         }
     }
@@ -921,9 +922,9 @@ mod tests {
     impl SpliceInfoProcessor for MockSpliceInsertProcessor {
         fn process(
             &self,
-            header: SpliceInfoHeader,
+            header: SpliceInfoHeader<'_>,
             command: SpliceCommand,
-            descriptors: SpliceDescriptorIter,
+            descriptors: SpliceDescriptorIter<'_>,
         ) {
             assert_eq!(header.encryption_algorithm(), EncryptionAlgorithm::None);
             assert_matches!(command, SpliceCommand::SpliceInsert{..});
@@ -948,9 +949,9 @@ mod tests {
     impl SpliceInfoProcessor for MockTimeSignalProcessor {
         fn process(
             &self,
-            header: SpliceInfoHeader,
+            header: SpliceInfoHeader<'_>,
             command: SpliceCommand,
-            descriptors: SpliceDescriptorIter,
+            descriptors: SpliceDescriptorIter<'_>,
         ) {
             assert_eq!(header.encryption_algorithm(), EncryptionAlgorithm::None);
             assert_matches!(command, SpliceCommand::TimeSignal{..});
