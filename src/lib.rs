@@ -406,7 +406,7 @@ pub trait SpliceInfoProcessor {
         &self,
         header: SpliceInfoHeader<'_>,
         command: SpliceCommand,
-        descriptors: SpliceDescriptorIter<'_>,
+        descriptors: SpliceDescriptors<'_>,
     );
 }
 
@@ -638,6 +638,18 @@ impl From<bitreader::BitReaderError> for SpliceDescriptorErr {
     }
 }
 
+pub struct SpliceDescriptors<'buf> {
+    buf: &'buf [u8],
+}
+impl<'buf> IntoIterator for &SpliceDescriptors<'buf> {
+    type Item = Result<SpliceDescriptor, SpliceDescriptorErr>;
+    type IntoIter = SpliceDescriptorIter<'buf>;
+
+    fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
+        SpliceDescriptorIter::new(self.buf)
+    }
+}
+
 pub struct SpliceDescriptorIter<'buf> {
     buf: &'buf [u8],
 }
@@ -744,7 +756,7 @@ where
                     self.processor.process(
                         splice_header,
                         splice_command,
-                        SpliceDescriptorIter::new(descriptors),
+                        SpliceDescriptors { buf: descriptors },
                     );
                 }
                 Some(Err(e)) => {
@@ -932,11 +944,11 @@ mod tests {
             &self,
             header: SpliceInfoHeader<'_>,
             command: SpliceCommand,
-            descriptors: SpliceDescriptorIter<'_>,
+            descriptors: SpliceDescriptors<'_>,
         ) {
             assert_eq!(header.encryption_algorithm(), EncryptionAlgorithm::None);
             assert_matches!(command, SpliceCommand::SpliceInsert{..});
-            for d in descriptors {
+            for d in &descriptors {
                 d.unwrap();
             }
         }
@@ -959,11 +971,11 @@ mod tests {
             &self,
             header: SpliceInfoHeader<'_>,
             command: SpliceCommand,
-            descriptors: SpliceDescriptorIter<'_>,
+            descriptors: SpliceDescriptors<'_>,
         ) {
             assert_eq!(header.encryption_algorithm(), EncryptionAlgorithm::None);
             assert_matches!(command, SpliceCommand::TimeSignal{..});
-            for d in descriptors {
+            for d in &descriptors {
                 d.unwrap();
             }
         }
