@@ -2,7 +2,14 @@
 
 ## 0.7.0
 ### Changed
+ - `SpliceInfoProcessor::process()` signature altered to take new `SpliceDescriptors` type, rather than
+   `SpliceDescriptorIterator` directly.  This makes it possible for implementations of `process()` to iterate through
+   the descriptors more than once.
  - All interesting types now implement `serde::Serialize` (so `serde` is now a dependency).
+ - Now depends on `mpeg2ts-reader` 0.8.
+
+### Added
+ - An `is_scte35()` utility function to test if SCTE-35 should be expected.
 
 ## 0.6.0
 ### Changed
