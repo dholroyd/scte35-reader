@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0
+### Changed
+ - All interesting types now implement `serde::Serialize` (so `serde` is now a dependency).
+
 ## 0.6.0
 ### Changed
  - Made most methods return `Result`, and remove all explicit `unwrap()` calls from within

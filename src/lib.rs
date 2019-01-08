@@ -3,8 +3,10 @@
 
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
-use std::fmt;
 use std::marker;
+use serde;
+use serde::ser::{ SerializeStruct, SerializeSeq };
+use serdebug::*;
 
 /// Utility function to search the PTM section for a `CUEI` registration descriptor per
 /// _SCTE-35, section 8.1_, which indicates that streams with `stream_type` equal to the private
@@ -22,7 +24,7 @@ pub fn is_scte35(pmt: &mpeg2ts_reader::psi::pmt::PmtSection<'_>) -> bool {
     }
     false
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, serde_derive::Serialize)]
 pub enum EncryptionAlgorithm {
     None,
     DesEcb,
@@ -49,7 +51,7 @@ impl EncryptionAlgorithm {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, serde_derive::Serialize)]
 pub enum SpliceCommandType {
     SpliceNull,
     Reserved(u8),
@@ -73,6 +75,7 @@ impl SpliceCommandType {
     }
 }
 
+#[derive(SerDebug)]
 pub struct SpliceInfoHeader<'a> {
     buf: &'a [u8],
 }
@@ -116,20 +119,24 @@ impl<'a> SpliceInfoHeader<'a> {
         SpliceCommandType::from_id(self.buf[10])
     }
 }
-impl<'a> fmt::Debug for SpliceInfoHeader<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        f.debug_struct("SpliceInfoHeader")
-            .field("protocol_version", &self.protocol_version())
-            .field("encrypted_packet", &self.encrypted_packet())
-            .field("encryption_algorithm", &self.encryption_algorithm())
-            .field("pts_adjustment", &self.pts_adjustment())
-            .field("cw_index", &self.cw_index())
-            .field("tier", &self.tier())
-            .finish()
+impl<'a> serde::Serialize for SpliceInfoHeader<'a> {
+
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer
+    {
+        let mut s = serializer.serialize_struct("SpliceInfoHeader", 6)?;
+        s.serialize_field("protocol_version", &self.protocol_version())?;
+        s.serialize_field("encrypted_packet", &self.encrypted_packet())?;
+        s.serialize_field("encryption_algorithm", &self.encryption_algorithm())?;
+        s.serialize_field("pts_adjustment", &self.pts_adjustment())?;
+        s.serialize_field("cw_index", &self.cw_index())?;
+        s.serialize_field("tier", &self.tier())?;
+        s.end()
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceCommand {
     SpliceNull {},
     SpliceInsert {
@@ -143,7 +150,7 @@ pub enum SpliceCommand {
     BandwidthReservation {},
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum NetworkIndicator {
     Out,
     In,
@@ -162,7 +169,7 @@ impl NetworkIndicator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceInsert {
     Cancel,
     Insert {
@@ -175,25 +182,25 @@ pub enum SpliceInsert {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceTime {
     Immediate,
     Timed(Option<u64>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub struct ComponentSplice {
     component_tag: u8,
     splice_time: SpliceTime,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceMode {
     Program(SpliceTime),
     Components(Vec<ComponentSplice>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum ReturnMode {
     Automatic,
     Manual,
@@ -208,7 +215,7 @@ impl ReturnMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, serde_derive::Serialize)]
 pub enum SegmentationUpidType {
     NotUsed,
     UserDefinedDeprecated,
@@ -252,7 +259,7 @@ impl SegmentationUpidType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, serde_derive::Serialize)]
 pub enum SegmentationTypeId {
     NotIndicated,
     ContentIdentification,
@@ -320,13 +327,13 @@ impl SegmentationTypeId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SegmentationUpid {
     None,
     SegmentationUpid { upid: Vec<u8> },
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum DeviceRestrictions {
     RestrictGroup0,
     RestrictGroup1,
@@ -349,7 +356,7 @@ impl DeviceRestrictions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum DeliveryRestrictionFlags {
     None,
     DeliveryRestrictions {
@@ -360,7 +367,7 @@ pub enum DeliveryRestrictionFlags {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SegmentationMode {
     Program,
     Component {
@@ -368,13 +375,13 @@ pub enum SegmentationMode {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub struct SegmentationModeComponent {
     component_tag: u8,
     pts_offset: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SegmentationDescriptor {
     Cancel,
     Insert {
@@ -395,7 +402,7 @@ pub enum SegmentationDescriptor {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub struct SpliceDuration {
     return_mode: ReturnMode,
     duration: u64,
@@ -410,7 +417,7 @@ pub trait SpliceInfoProcessor {
     );
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceDescriptor {
     AvailDescriptor {
         provider_avail_id: u32,
@@ -612,7 +619,7 @@ impl SpliceDescriptor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceDescriptorErr {
     InvalidDescriptorLength(usize),
     NotEnoughData { expected: usize, actual: usize },
@@ -647,6 +654,20 @@ impl<'buf> IntoIterator for &SpliceDescriptors<'buf> {
 
     fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
         SpliceDescriptorIter::new(self.buf)
+    }
+}
+impl<'a> serde::Serialize for SpliceDescriptors<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer
+    {
+        let mut s = serializer.serialize_seq(None)?;
+        for e in self {
+            if let Ok(elem) = e {
+                s.serialize_element(&elem)?;
+            }
+        }
+        s.end()
     }
 }
 

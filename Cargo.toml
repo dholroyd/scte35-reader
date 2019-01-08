@@ -12,7 +12,9 @@ edition = "2018"
 [dependencies]
 mpeg2ts-reader = "0.8.0"
 bitreader = "0.3.1"
-
+serdebug = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
 
 [dev-dependencies]
 hex-literal = "0.1.0"
