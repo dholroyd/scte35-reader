@@ -1,6 +1,6 @@
 [package]
 name = "scte35-reader"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["David Holroyd <dave@badgers-in-foil.co.uk>"]
 description = "Reader for data formatted according to SCTE-35"
 repository = "https://github.com/dholroyd/scte35-reader"
