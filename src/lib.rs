@@ -949,12 +949,9 @@ mod tests {
     use mpeg2ts_reader::psi;
     use mpeg2ts_reader::psi::SectionProcessor;
 
-    mpeg2ts_reader::demux_context!(NullDemuxContext, NullStreamConstructor);
-    pub struct NullStreamConstructor;
-    impl demultiplex::StreamConstructor for NullStreamConstructor {
-        type F = demultiplex::NullPacketFilter<NullDemuxContext>;
-
-        fn construct(&mut self, _req: demultiplex::FilterRequest<'_, '_>) -> Self::F {
+    mpeg2ts_reader::demux_context!(NullDemuxContext, demultiplex::NullPacketFilter<NullDemuxContext>);
+    impl NullDemuxContext {
+        fn do_construct(&mut self, _req: demultiplex::FilterRequest<'_, '_>) -> demultiplex::NullPacketFilter<NullDemuxContext> {
             unimplemented!();
         }
     }
@@ -982,7 +979,7 @@ mod tests {
         );
         let mut parser = Scte35SectionProcessor::new(MockSpliceInsertProcessor);
         let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
-        let mut ctx = NullDemuxContext::new(NullStreamConstructor);
+        let mut ctx = NullDemuxContext::new();
         parser.start_section(&mut ctx, &header, &data[..]);
     }
 
@@ -1009,7 +1006,7 @@ mod tests {
         );
         let mut parser = Scte35SectionProcessor::new(MockTimeSignalProcessor);
         let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
-        let mut ctx = NullDemuxContext::new(NullStreamConstructor);
+        let mut ctx = NullDemuxContext::new();
         parser.start_section(&mut ctx, &header, &data[..]);
     }
 
