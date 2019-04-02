@@ -816,7 +816,7 @@ where
         }
     }
     fn splice_null(payload: &[u8]) -> Result<SpliceCommand, SpliceDescriptorErr> {
-        if 0 == payload.len() {
+        if payload.is_empty() {
             Ok(SpliceCommand::SpliceNull {})
         } else {
             Err(SpliceDescriptorErr::InvalidDescriptorLength(payload.len()))
@@ -849,7 +849,7 @@ where
     }
 
     fn bandwidth_reservation(payload: &[u8]) -> Result<SpliceCommand, SpliceDescriptorErr> {
-        if 0 == payload.len() {
+        if payload.is_empty() {
             Ok(SpliceCommand::BandwidthReservation {})
         } else {
             Err(SpliceDescriptorErr::InvalidDescriptorLength(payload.len()))
