@@ -3,10 +3,10 @@
 
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
-use std::marker;
 use serde;
-use serde::ser::{ SerializeStruct, SerializeSeq };
+use serde::ser::{SerializeSeq, SerializeStruct};
 use serdebug::*;
+use std::marker;
 
 /// Utility function to search the PTM section for a `CUEI` registration descriptor per
 /// _SCTE-35, section 8.1_, which indicates that streams with `stream_type` equal to the private
@@ -120,10 +120,9 @@ impl<'a> SpliceInfoHeader<'a> {
     }
 }
 impl<'a> serde::Serialize for SpliceInfoHeader<'a> {
-
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer
+        S: serde::Serializer,
     {
         let mut s = serializer.serialize_struct("SpliceInfoHeader", 6)?;
         s.serialize_field("protocol_version", &self.protocol_version())?;
@@ -658,8 +657,8 @@ impl<'buf> IntoIterator for &SpliceDescriptors<'buf> {
 }
 impl<'a> serde::Serialize for SpliceDescriptors<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer
+    where
+        S: serde::Serializer,
     {
         let mut s = serializer.serialize_seq(None)?;
         for e in self {
@@ -949,9 +948,15 @@ mod tests {
     use mpeg2ts_reader::psi;
     use mpeg2ts_reader::psi::SectionProcessor;
 
-    mpeg2ts_reader::demux_context!(NullDemuxContext, demultiplex::NullPacketFilter<NullDemuxContext>);
+    mpeg2ts_reader::demux_context!(
+        NullDemuxContext,
+        demultiplex::NullPacketFilter<NullDemuxContext>
+    );
     impl NullDemuxContext {
-        fn do_construct(&mut self, _req: demultiplex::FilterRequest<'_, '_>) -> demultiplex::NullPacketFilter<NullDemuxContext> {
+        fn do_construct(
+            &mut self,
+            _req: demultiplex::FilterRequest<'_, '_>,
+        ) -> demultiplex::NullPacketFilter<NullDemuxContext> {
             unimplemented!();
         }
     }
