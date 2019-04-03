@@ -1,3 +1,81 @@
+//! Parser data formatted according to
+//! [SCTE-35](http://www.scte.org/SCTEDocs/Standards/SCTE%2035%202016.pdf).
+//!
+//! Intended to be used in conjunction with the
+//! [mpeg2ts-reader](https://crates.io/crates/mpeg2ts-reader) crate's facilities for processing
+//! the Transport Stream structures within which SCTE-35 data is usually embedded.
+//!
+//! ## Example
+//!
+//! ```
+//! # use hex_literal::*;
+//! # use scte35_reader::Scte35SectionProcessor;
+//! # use mpeg2ts_reader::psi::SectionProcessor;
+//! # use mpeg2ts_reader::{ psi, demultiplex };
+//! # mpeg2ts_reader::demux_context!(
+//! #        NullDemuxContext,
+//! #        demultiplex::NullPacketFilter<NullDemuxContext>
+//! #    );
+//! # impl NullDemuxContext {
+//! #    fn do_construct(
+//! #        &mut self,
+//! #        _req: demultiplex::FilterRequest<'_, '_>,
+//! #    ) -> demultiplex::NullPacketFilter<NullDemuxContext> {
+//! #        unimplemented!();
+//! #    }
+//! # }
+//! pub struct DumpSpliceInfoProcessor;
+//! impl scte35_reader::SpliceInfoProcessor for DumpSpliceInfoProcessor {
+//!     fn process(
+//!         &self,
+//!         header: scte35_reader::SpliceInfoHeader<'_>,
+//!         command: scte35_reader::SpliceCommand,
+//!         descriptors: scte35_reader::SpliceDescriptors<'_>,
+//!     ) {
+//!         println!("{:?} {:#?}", header, command);
+//!         for d in &descriptors {
+//!             println!(" - {:?}", d);
+//!         }
+//!     }
+//! }
+//!
+//! let data = hex!(
+//!             "fc302500000000000000fff01405000000017feffe2d142b00fe0123d3080001010100007f157a49"
+//!         );
+//! let mut parser = Scte35SectionProcessor::new(DumpSpliceInfoProcessor);
+//! let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
+//! let mut ctx = NullDemuxContext::new();
+//! parser.start_section(&mut ctx, &header, &data[..]);
+//! ```
+//!
+//! Output:
+//!
+//! ```plain
+//! SpliceInfoHeader { protocol_version: 0, encrypted_packet: false, encryption_algorithm: None, pts_adjustment: 0, cw_index: 0, tier: 4095 } SpliceInsert {
+//!     splice_event_id: 1,
+//!     reserved: 127,
+//!     splice_detail: Insert {
+//!         network_indicator: Out,
+//!         splice_mode: Program(
+//!             Timed(
+//!                 Some(
+//!                     756296448
+//!                 )
+//!             )
+//!         ),
+//!         duration: Some(
+//!             SpliceDuration {
+//!                 return_mode: Automatic,
+//!                 duration: 19125000
+//!             }
+//!         ),
+//!         unique_program_id: 1,
+//!         avail_num: 1,
+//!         avails_expected: 1
+//!     }
+//! }
+//! ```
+
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms, future_incompatible)]
 
@@ -75,6 +153,10 @@ impl SpliceCommandType {
     }
 }
 
+/// Header element within a SCTE-43 _splice_info_section_ containing metadata generic across all kinds of _splice-command_.
+///
+/// This is a wrapper around a byte-slice that will extract requested fields on demand, as its
+/// methods are called.
 #[derive(SerDebug)]
 pub struct SpliceInfoHeader<'a> {
     buf: &'a [u8],
@@ -82,23 +164,36 @@ pub struct SpliceInfoHeader<'a> {
 impl<'a> SpliceInfoHeader<'a> {
     const HEADER_LENGTH: usize = 11;
 
+    /// Splits the given buffer into a `SpliceInfoHeader` element, and a remainder which will
+    /// include the _splice-command_ itself, plus any _descriptor_loop_.
     pub fn new(buf: &'a [u8]) -> (SpliceInfoHeader<'a>, &'a [u8]) {
         if buf.len() < 11 {
             panic!("buffer too short: {} (expected 11)", buf.len());
         }
         let (head, tail) = buf.split_at(11);
         (SpliceInfoHeader { buf: head }, tail)
+        // TODO: change this to return Err if the protocol_version or encrypted_packet values are
+        //       unsupported
     }
 
+    /// The version of the SCTE-35 data structures carried in this _splice_info_section_ (only
+    /// version `0` is supported by this library).
     pub fn protocol_version(&self) -> u8 {
         self.buf[0]
     }
+
+    /// Indicates that portions of this _splice_info_section_ are encrypted (only un-encrypted
+    /// data is supported by this library).
     pub fn encrypted_packet(&self) -> bool {
         self.buf[1] & 0b1000_0000 != 0
     }
+    /// The algorithm by which portions of this _splice_info_section_ are encrypted (only
+    /// un-encrypted data is supported by this library).
     pub fn encryption_algorithm(&self) -> EncryptionAlgorithm {
         EncryptionAlgorithm::from_id((self.buf[1] & 0b0111_1110) >> 1)
     }
+    /// A 33-bit adjustment value to be applied to any PTS value in a _splice-command_ within this
+    /// _splice_info_section_.
     pub fn pts_adjustment(&self) -> u64 {
         u64::from(self.buf[1] & 1) << 32
             | u64::from(self.buf[2]) << 24
@@ -106,15 +201,20 @@ impl<'a> SpliceInfoHeader<'a> {
             | u64::from(self.buf[4]) << 8
             | u64::from(self.buf[5])
     }
+    /// Identifier for the 'control word' (key) used to encrypt the message, if `encrypted_packet`
+    /// is true.
     pub fn cw_index(&self) -> u8 {
         self.buf[6]
     }
+    /// 12-bit authorization tier.
     pub fn tier(&self) -> u16 {
         u16::from(self.buf[7]) << 4 | u16::from(self.buf[8]) >> 4
     }
+    /// Length in bytes of the _splice-command_ data within this message.
     pub fn splice_command_length(&self) -> u16 {
         u16::from(self.buf[8] & 0b0000_1111) << 8 | u16::from(self.buf[9])
     }
+    /// Type of _splice-command_ within this message.
     pub fn splice_command_type(&self) -> SpliceCommandType {
         SpliceCommandType::from_id(self.buf[10])
     }
