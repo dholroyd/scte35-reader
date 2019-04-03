@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+### Changed
+ - Bumped `mpeg2ts-reader` to latest 0.10.0 release
+
+### Added
+ - More documentation
+
 ## 0.7.0
 ### Changed
  - `SpliceInfoProcessor::process()` signature altered to take new `SpliceDescriptors` type, rather than
