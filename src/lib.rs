@@ -833,6 +833,14 @@ where
         data: &'a [u8],
     ) {
         if header.table_id == 0xfc {
+            // no CRC while fuzz-testing, to make it more likely to find parser bugs,
+            if !cfg!(fuzzing) {
+                let crc = mpeg2ts_reader::mpegts_crc::sum32(data);
+                if crc != 0 {
+                    println!("SCTE35: section CRC check failed {:#08x}", crc);
+                    return;
+                }
+            }
             let section_data = &data[psi::SectionCommonHeader::SIZE..];
             if section_data.len() < SpliceInfoHeader::HEADER_LENGTH + 4 {
                 println!(
@@ -842,7 +850,7 @@ where
                 );
                 return;
             }
-            // trim off the 32-bit CRC, TODO: check the CRC!  (possibly in calling code rather than here?)
+            // trim off the 32-bit CRC
             let section_data = &section_data[..section_data.len() - 4];
             let (splice_header, rest) = SpliceInfoHeader::new(section_data);
             //println!("splice header len={}, type={:?}", splice_header.splice_command_length(), splice_header.splice_command_type());

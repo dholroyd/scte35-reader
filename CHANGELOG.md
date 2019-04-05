@@ -4,6 +4,7 @@
 ### Changed
  - `Scte35SectionProcessor` implements `WholeCompactSyntaxPayloadParser` rather than `SectionProcessor` so that it can
    now handle SCTE 35 sections that span more than one TS packet
+ - Now checks that the CRC in the section data is correct, and will not parse if incorrect.
 
 ## 0.9.0
 ### Changed
