@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0
+### Changed
+ - `Scte35SectionProcessor` implements `WholeCompactSyntaxPayloadParser` rather than `SectionProcessor` so that it can
+   now handle SCTE 35 sections that span more than one TS packet
+
 ## 0.9.0
 ### Changed
  - Bumped `mpeg2ts-reader` to latest 0.10.0 release

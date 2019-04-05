@@ -10,7 +10,7 @@
 //! ```
 //! # use hex_literal::*;
 //! # use scte35_reader::Scte35SectionProcessor;
-//! # use mpeg2ts_reader::psi::SectionProcessor;
+//! # use mpeg2ts_reader::psi::WholeCompactSyntaxPayloadParser;
 //! # use mpeg2ts_reader::{ psi, demultiplex };
 //! # mpeg2ts_reader::demux_context!(
 //! #        NullDemuxContext,
@@ -45,7 +45,7 @@
 //! let mut parser = Scte35SectionProcessor::new(DumpSpliceInfoProcessor);
 //! let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
 //! let mut ctx = NullDemuxContext::new();
-//! parser.start_section(&mut ctx, &header, &data[..]);
+//! parser.section(&mut ctx, &header, &data[..]);
 //! ```
 //!
 //! Output:
@@ -820,13 +820,13 @@ where
     processor: P,
     phantom: marker::PhantomData<Ctx>,
 }
-impl<P, Ctx: demultiplex::DemuxContext> psi::SectionProcessor for Scte35SectionProcessor<P, Ctx>
+impl<P, Ctx: demultiplex::DemuxContext> psi::WholeCompactSyntaxPayloadParser for Scte35SectionProcessor<P, Ctx>
 where
     P: SpliceInfoProcessor,
 {
     type Context = Ctx;
 
-    fn start_section<'a>(
+    fn section<'a>(
         &mut self,
         _ctx: &mut Self::Context,
         header: &psi::SectionCommonHeader,
@@ -895,14 +895,6 @@ where
                 header.table_id
             );
         }
-    }
-
-    fn continue_section<'a>(&mut self, _ctx: &mut Self::Context, _section_data: &'a [u8]) {
-        unimplemented!()
-    }
-
-    fn reset(&mut self) {
-        unimplemented!()
     }
 }
 impl<P, Ctx: demultiplex::DemuxContext> Scte35SectionProcessor<P, Ctx>
@@ -1046,7 +1038,7 @@ mod tests {
     use matches::*;
     use mpeg2ts_reader::demultiplex;
     use mpeg2ts_reader::psi;
-    use mpeg2ts_reader::psi::SectionProcessor;
+    use mpeg2ts_reader::psi::WholeCompactSyntaxPayloadParser;
 
     mpeg2ts_reader::demux_context!(
         NullDemuxContext,
@@ -1085,7 +1077,7 @@ mod tests {
         let mut parser = Scte35SectionProcessor::new(MockSpliceInsertProcessor);
         let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
         let mut ctx = NullDemuxContext::new();
-        parser.start_section(&mut ctx, &header, &data[..]);
+        parser.section(&mut ctx, &header, &data[..]);
     }
 
     struct MockTimeSignalProcessor;
@@ -1112,7 +1104,7 @@ mod tests {
         let mut parser = Scte35SectionProcessor::new(MockTimeSignalProcessor);
         let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
         let mut ctx = NullDemuxContext::new();
-        parser.start_section(&mut ctx, &header, &data[..]);
+        parser.section(&mut ctx, &header, &data[..]);
     }
 
     #[test]
