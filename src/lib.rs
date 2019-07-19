@@ -567,7 +567,7 @@ impl SpliceDescriptor {
                 let component_count = r.read_u8(8)?;
                 let mut components = Vec::with_capacity(component_count as usize);
 
-                for _i in 0..component_count - 1 {
+                for _ in 0..component_count {
                     let component_tag = r.read_u8(8)?;
                     r.skip(7)?;
                     let pts_offset = r.read_u64(33)?;
@@ -592,7 +592,7 @@ impl SpliceDescriptor {
             let segmentation_upid_length = r.read_u8(8)?;
             let segmentation_upid = if segmentation_upid_length > 0 {
                 let mut upid = Vec::with_capacity(segmentation_upid_length as usize);
-                for _i in 0..segmentation_upid_length - 1 {
+                for _ in 0..segmentation_upid_length {
                     upid.push(r.read_u8(8)?);
                 }
                 SegmentationUpid::SegmentationUpid { upid }
@@ -653,7 +653,7 @@ impl SpliceDescriptor {
         let dtmf_count = r.read_u8(3)?;
         r.skip(5)?;
         let mut dtmf_chars = Vec::with_capacity(dtmf_count as usize);
-        for _i in 0..dtmf_count - 1 {
+        for _ in 0..dtmf_count {
             dtmf_chars.push(r.read_u8(8)?)
         }
         assert_eq!(r.position() as usize, buf.len() * 8);
@@ -1169,5 +1169,17 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn segmentation_descriptor() {
+        let data = hex!("480000ad7f9f0808000000002cb2d79d350200");
+        let desc = SpliceDescriptor::parse_segmentation_descriptor(&data[..]).unwrap();
+        match desc {
+            SpliceDescriptor::SegmentationDescriptor { descriptor_detail: SegmentationDescriptor::Insert { segmentation_upid: SegmentationUpid::SegmentationUpid { upid }, .. }, .. } => {
+                assert_eq!(upid.len(), 8);
+            },
+            _ => panic!("unexpected {:?}", desc),
+        };
     }
 }
