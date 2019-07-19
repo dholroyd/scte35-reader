@@ -671,6 +671,10 @@ impl SpliceDescriptor {
         }
         let splice_descriptor_tag = buf[0];
         let splice_descriptor_len = buf[1] as usize;
+        if splice_descriptor_len < 4 {
+            // descriptor must at least be big enough to hold the 4-byte id value
+            return Err(SpliceDescriptorErr::InvalidDescriptorLength(splice_descriptor_len));
+        }
         let splice_descriptor_end = splice_descriptor_len + 2;
         if splice_descriptor_end > buf.len() {
             return Err(SpliceDescriptorErr::NotEnoughData {
@@ -1126,6 +1130,11 @@ mod tests {
         assert_matches!(
             SpliceDescriptor::parse(&data[..]),
             Err(SpliceDescriptorErr::NotEnoughData { .. })
+        );
+        let data = hex!("01034D59494400000003");
+        assert_matches!(
+            SpliceDescriptor::parse(&data[..]),
+            Err(SpliceDescriptorErr::InvalidDescriptorLength { .. })
         );
         let data = hex!("01084D59494400000003");
         assert_matches!(
