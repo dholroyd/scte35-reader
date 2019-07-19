@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0
+### Fixed
+ - Avoid panic on unexpectedly small values of `splice_descriptor_len`
+ - Fix off-by-one bug in parsing some descriptor data causing an assertion to trigger, per
+   [#3](https://github.com/dholroyd/scte35-reader/issues/3).
+
 ## 0.10.0
 ### Changed
  - `Scte35SectionProcessor` implements `WholeCompactSyntaxPayloadParser` rather than `SectionProcessor` so that it can
