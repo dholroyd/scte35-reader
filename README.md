@@ -2,7 +2,7 @@
 
 [![crates.io version](https://img.shields.io/crates/v/scte35-reader.svg)](https://crates.io/crates/scte35-reader)
 
-Parser data formatted according to [SCTE-35](http://www.scte.org/SCTEDocs/Standards/SCTE%2035%202016.pdf).
+Parser data formatted according to [SCTE-35](https://scte-cms-resource-storage.s3.amazonaws.com/ANSI_SCTE-35-2019a-1582645390859.pdf).
 
 For an example of usage, see the [scte35dump](https://github.com/dholroyd/scte35dump) tool.
 
