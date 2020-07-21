@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+### Changed
+ - Extended error type's `NotEnoughData` variant with a `field_name` describing what data we were trying to parse when
+   we ran out of bytes.
+
 ## 0.11.0
 ### Fixed
  - Avoid panic on unexpectedly small values of `splice_descriptor_len`
