@@ -4,6 +4,7 @@
 ### Fixed
  - Fixed failure to parse marker with `segmentation_descriptor()` that omits the optional `sub_segment_num` and
    `sub_segments_expected` fields.
+ - Fixed panics on encountering descriptors with more bytes than the parser was able to consume.
 
 ### Changed
  - Extended error type's `NotEnoughData` variant with a `field_name` describing what data we were trying to parse when

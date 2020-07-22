@@ -651,7 +651,17 @@ impl SpliceDescriptor {
             descriptor_detail: Self::parse_segmentation_descriptor_details(&mut r, cancel)?,
         };
 
-        assert_eq!(r.position() as usize, buf.len() * 8);
+        // if we end up without reading to the end of a byte, this must indicate a bug in the
+        // parsing routine,
+        assert!(r.is_aligned(1));
+
+        if buf.len() > (r.position()/8) as usize {
+            println!(
+                "SCTE35: only {} bytes consumed data in segmentation_descriptor of {} bytes",
+                r.position() / 8,
+                buf.len()
+            );
+        }
         Ok(result)
     }
 
@@ -664,7 +674,19 @@ impl SpliceDescriptor {
             .map(|_| r.read_u8(8) )
             .collect();
         let dtmf_chars = dtmf_chars_result.named("dtmf_descriptor")?;
-        assert_eq!(r.position() as usize, buf.len() * 8);
+
+        // if we end up without reading to the end of a byte, this must indicate a bug in the
+        // parsing routine,
+        assert!(r.is_aligned(1));
+
+        if buf.len() > (r.position()/8) as usize {
+            println!(
+                "SCTE35: only {} bytes consumed data in segmentation_descriptor of {} bytes",
+                r.position() / 8,
+                buf.len()
+            );
+        }
+
         Ok(SpliceDescriptor::DTMFDescriptor {
             preroll,
             dtmf_chars,
@@ -956,7 +978,18 @@ where
             reserved,
             splice_detail: Self::read_splice_detail(&mut r, splice_event_cancel_indicator)?,
         };
-        assert_eq!(r.position() as usize, payload.len() * 8);
+
+        // if we end up without reading to the end of a byte, this must indicate a bug in the
+        // parsing routine,
+        assert!(r.is_aligned(1));
+
+        if payload.len() > (r.position()/8) as usize {
+            println!(
+                "SCTE35: only {} bytes consumed data in splice_insert of {} bytes",
+                r.position() / 8,
+                payload.len()
+            );
+        }
         Ok(result)
     }
 
@@ -966,7 +999,18 @@ where
         let result = SpliceCommand::TimeSignal {
             splice_time: SpliceTime::Timed(Self::read_splice_time(&mut r)?),
         };
-        assert_eq!(r.position() as usize, payload.len() * 8);
+
+        // if we end up without reading to the end of a byte, this must indicate a bug in the
+        // parsing routine,
+        assert!(r.is_aligned(1));
+
+        if payload.len() > (r.position()/8) as usize {
+            println!(
+                "SCTE35: only {} bytes consumed data in time_signal of {} bytes",
+                r.position() / 8,
+                payload.len()
+            );
+        }
         Ok(result)
     }
 
@@ -1206,6 +1250,13 @@ mod tests {
         // This segmentation_descriptor() does not include sub_segment_num or
         // sub_segments_expected fields.  Their absence should not cause parsing problems.
         let data = hex!("480000bf7fcf0000f8fa630d110e054c413330390808000000002e538481340000");
+        SpliceDescriptor::parse_segmentation_descriptor(&data[..]).unwrap();
+    }
+
+    #[test]
+    fn too_large_segment_descriptor() {
+        // there are more bytes than expected; this should not panic
+        let data = hex!("480000ad7f9f0808000000002cb2d79d350200000000");
         SpliceDescriptor::parse_segmentation_descriptor(&data[..]).unwrap();
     }
 }
