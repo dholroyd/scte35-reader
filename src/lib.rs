@@ -731,25 +731,36 @@ impl SpliceDescriptor {
                 },
                 0x01 => Self::parse_dtmf_descriptor(&buf[6..splice_descriptor_end])?,
                 0x02 => Self::parse_segmentation_descriptor(&buf[6..splice_descriptor_end])?,
-                0x03 => SpliceDescriptor::TimeDescriptor {
-                    tai_seconds: u64::from(buf[6]) << 40
-                        | u64::from(buf[7]) << 32
-                        | u64::from(buf[8]) << 24
-                        | u64::from(buf[9]) << 16
-                        | u64::from(buf[10]) << 8
-                        | u64::from(buf[11]),
-                    tai_nanoseconds: u32::from(buf[12]) << 24
-                        | u32::from(buf[13]) << 16
-                        | u32::from(buf[14]) << 8
-                        | u32::from(buf[15]),
-                    utc_offset: u16::from(buf[16]) << 8 | u16::from(buf[17]),
-                },
+                0x03 => Self::parse_time_descriptor(&buf[6..splice_descriptor_end])?,
                 _ => SpliceDescriptor::Reserved {
                     tag: splice_descriptor_tag,
                     identifier: [id[0], id[1], id[2], id[3]],
                     private_bytes: buf[6..splice_descriptor_end].to_owned(),
                 },
             }
+        })
+    }
+
+    fn parse_time_descriptor(buf: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
+        if buf.len() < 12 {
+            return Err(SpliceDescriptorErr::NotEnoughData {
+                field_name: "time_descriptor",
+                expected: 12,
+                actual: buf.len(),
+            })
+        }
+        Ok(SpliceDescriptor::TimeDescriptor {
+            tai_seconds: u64::from(buf[0]) << 40
+                | u64::from(buf[1]) << 32
+                | u64::from(buf[2]) << 24
+                | u64::from(buf[3]) << 16
+                | u64::from(buf[4]) << 8
+                | u64::from(buf[5]),
+            tai_nanoseconds: u32::from(buf[6]) << 24
+                | u32::from(buf[7]) << 16
+                | u32::from(buf[8]) << 8
+                | u32::from(buf[9]),
+            utc_offset: u16::from(buf[10]) << 8 | u16::from(buf[11]),
         })
     }
 }
