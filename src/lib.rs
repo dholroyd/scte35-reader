@@ -723,12 +723,7 @@ impl SpliceDescriptor {
             }
         } else {
             match splice_descriptor_tag {
-                0x00 => SpliceDescriptor::AvailDescriptor {
-                    provider_avail_id: u32::from(buf[6]) << 24
-                        | u32::from(buf[7]) << 16
-                        | u32::from(buf[8]) << 8
-                        | u32::from(buf[9]),
-                },
+                0x00 => Self::parse_avail_descriptor(&buf[6..splice_descriptor_end])?,
                 0x01 => Self::parse_dtmf_descriptor(&buf[6..splice_descriptor_end])?,
                 0x02 => Self::parse_segmentation_descriptor(&buf[6..splice_descriptor_end])?,
                 0x03 => Self::parse_time_descriptor(&buf[6..splice_descriptor_end])?,
@@ -738,6 +733,22 @@ impl SpliceDescriptor {
                     private_bytes: buf[6..splice_descriptor_end].to_owned(),
                 },
             }
+        })
+    }
+
+    fn parse_avail_descriptor(buf: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
+        if buf.len() < 4 {
+            return Err(SpliceDescriptorErr::NotEnoughData {
+                field_name: "avail_descriptor",
+                expected: 4,
+                actual: buf.len(),
+            })
+        }
+        Ok(SpliceDescriptor::AvailDescriptor {
+            provider_avail_id: u32::from(buf[0]) << 24
+                | u32::from(buf[1]) << 16
+                | u32::from(buf[2]) << 8
+                | u32::from(buf[3]),
         })
     }
 
