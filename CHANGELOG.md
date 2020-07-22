@@ -1,9 +1,16 @@
 # Changelog
 
 ## Unreleased
+### Fixed
+ - Fixed failure to parse marker with `segmentation_descriptor()` that omits the optional `sub_segment_num` and
+   `sub_segments_expected` fields.
+
 ### Changed
  - Extended error type's `NotEnoughData` variant with a `field_name` describing what data we were trying to parse when
    we ran out of bytes.
+ - As a result of fixing sub_segments field handling, the `sub_segment_num` and `sub_segments_expected` fields are
+   no longer directly present in `SegmentationDescriptor::Insert`, and have moved to a new, optional `SebSegments`
+   struct.
 
 ## 0.11.0
 ### Fixed

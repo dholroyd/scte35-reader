@@ -496,9 +496,14 @@ pub enum SegmentationDescriptor {
         segmentation_type_id: SegmentationTypeId,
         segment_num: u8,
         segments_expected: u8,
-        sub_segment_num: u8,
-        sub_segments_expected: u8,
+        sub_segments: Option<SubSegments>
     },
+}
+
+#[derive(Debug, serde_derive::Serialize)]
+pub struct SubSegments {
+    sub_segment_num: u8,
+    sub_segments_expected: u8,
 }
 
 #[derive(Debug, serde_derive::Serialize)]
@@ -604,13 +609,17 @@ impl SpliceDescriptor {
             let segment_num = r.read_u8(8).named("segment_num")?;
             let segments_expected = r.read_u8(8).named("segments_expected")?;
 
-            let (sub_segment_num, sub_segments_expected) = if segmentation_type_id
-                == SegmentationTypeId::ProviderPlacementOpportunityStart
-                || segmentation_type_id == SegmentationTypeId::DistributorPlacementOpportunityStart
+            // The spec notes: "sub_segment_num and sub_segments_expected can form an optional
+            // appendix to the segmentation descriptor. The presence or absence of this optional
+            // data block is determined by the descriptor loop's descriptor_length."
+            let sub_segments = if r.relative_reader().skip(1).is_ok()
             {
-                (r.read_u8(8).named("sub_segment_num")?, r.read_u8(8).named("sub_segments_expected")?)
+                Some(SubSegments {
+                    sub_segment_num: r.read_u8(8).named("sub_segment_num")?,
+                    sub_segments_expected: r.read_u8(8).named("sub_segments_expected")?,
+                })
             } else {
-                (0, 0)
+                None
             };
 
             Ok(SegmentationDescriptor::Insert {
@@ -626,8 +635,7 @@ impl SpliceDescriptor {
                 segmentation_type_id,
                 segment_num,
                 segments_expected,
-                sub_segment_num,
-                sub_segments_expected,
+                sub_segments,
             })
         }
     }
@@ -1175,8 +1183,7 @@ mod tests {
                     segmentation_type_id: SegmentationTypeId::ProgramStart,
                     segment_num: 1,
                     segments_expected: 1,
-                    sub_segment_num: 0,
-                    sub_segments_expected: 0
+                    sub_segments: None,
                 }
             })
         );
@@ -1192,5 +1199,13 @@ mod tests {
             },
             _ => panic!("unexpected {:?}", desc),
         };
+    }
+
+    #[test]
+    fn no_sub_segment_num() {
+        // This segmentation_descriptor() does not include sub_segment_num or
+        // sub_segments_expected fields.  Their absence should not cause parsing problems.
+        let data = hex!("480000bf7fcf0000f8fa630d110e054c413330390808000000002e538481340000");
+        SpliceDescriptor::parse_segmentation_descriptor(&data[..]).unwrap();
     }
 }
