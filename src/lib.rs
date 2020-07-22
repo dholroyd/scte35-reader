@@ -81,7 +81,6 @@
 
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
-use serde;
 use serde::ser::{SerializeSeq, SerializeStruct};
 use serdebug::*;
 use std::marker;
