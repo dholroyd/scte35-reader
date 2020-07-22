@@ -716,23 +716,23 @@ impl SpliceDescriptor {
         }
         let id = &buf[2..6];
         Ok(if id != b"CUEI" {
-            SpliceDescriptor::Reserved {
-                tag: splice_descriptor_tag,
-                identifier: [id[0], id[1], id[2], id[3]],
-                private_bytes: buf[6..splice_descriptor_end].to_owned(),
-            }
+            Self::parse_reserved(&buf[6..splice_descriptor_end], splice_descriptor_tag, id)?
         } else {
             match splice_descriptor_tag {
                 0x00 => Self::parse_avail_descriptor(&buf[6..splice_descriptor_end])?,
                 0x01 => Self::parse_dtmf_descriptor(&buf[6..splice_descriptor_end])?,
                 0x02 => Self::parse_segmentation_descriptor(&buf[6..splice_descriptor_end])?,
                 0x03 => Self::parse_time_descriptor(&buf[6..splice_descriptor_end])?,
-                _ => SpliceDescriptor::Reserved {
-                    tag: splice_descriptor_tag,
-                    identifier: [id[0], id[1], id[2], id[3]],
-                    private_bytes: buf[6..splice_descriptor_end].to_owned(),
-                },
+                _ => Self::parse_reserved(&buf[6..splice_descriptor_end], splice_descriptor_tag, id)?,
             }
+        })
+    }
+
+    fn parse_reserved(buf: &[u8], splice_descriptor_tag: u8, id: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
+        Ok(SpliceDescriptor::Reserved {
+            tag: splice_descriptor_tag,
+            identifier: [id[0], id[1], id[2], id[3]],
+            private_bytes: buf.to_owned(),
         })
     }
 
