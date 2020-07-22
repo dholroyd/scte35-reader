@@ -715,17 +715,18 @@ impl SpliceDescriptor {
             });
         }
         let id = &buf[2..6];
-        Ok(if id != b"CUEI" {
-            Self::parse_reserved(&buf[6..splice_descriptor_end], splice_descriptor_tag, id)?
-        } else {
+        let payload = &buf[6..splice_descriptor_end];
+        if id == b"CUEI" {
             match splice_descriptor_tag {
-                0x00 => Self::parse_avail_descriptor(&buf[6..splice_descriptor_end])?,
-                0x01 => Self::parse_dtmf_descriptor(&buf[6..splice_descriptor_end])?,
-                0x02 => Self::parse_segmentation_descriptor(&buf[6..splice_descriptor_end])?,
-                0x03 => Self::parse_time_descriptor(&buf[6..splice_descriptor_end])?,
-                _ => Self::parse_reserved(&buf[6..splice_descriptor_end], splice_descriptor_tag, id)?,
+                0x00 => Self::parse_avail_descriptor(payload),
+                0x01 => Self::parse_dtmf_descriptor(payload),
+                0x02 => Self::parse_segmentation_descriptor(payload),
+                0x03 => Self::parse_time_descriptor(payload),
+                _ => Self::parse_reserved(payload, splice_descriptor_tag, id),
             }
-        })
+        } else {
+            Self::parse_reserved(payload, splice_descriptor_tag, id)
+        }
     }
 
     fn parse_reserved(buf: &[u8], splice_descriptor_tag: u8, id: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
