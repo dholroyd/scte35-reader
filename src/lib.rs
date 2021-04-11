@@ -597,13 +597,6 @@ impl SegmentationUpid {
         let mut data = &upid[..];
         let mut result = vec![];
         while !data.is_empty() {
-            if data.len() < 1 {
-                return Err(SpliceDescriptorErr::not_enough_data(
-                    "MID.segmentation_upid_type",
-                    1,
-                    0,
-                ));
-            }
             if data.len() < 2 {
                 return Err(SpliceDescriptorErr::not_enough_data("MID.length", 1, 0));
             }
