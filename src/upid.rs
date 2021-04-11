@@ -36,6 +36,7 @@ fn hex_tuple(name: &str, f: &mut fmt::Formatter<'_>, val: &[u8]) -> fmt::Result 
     write!(f, "{}({:02x})", name, val.plain_hex(false))
 }
 
+/// Represents the UPID with type `0x01`, which the SCTE-35 standard says is deprecated.
 #[derive(serde_derive::Serialize)]
 pub struct UserDefinedDeprecated(pub Vec<u8>);
 impl fmt::Debug for UserDefinedDeprecated {
@@ -52,6 +53,7 @@ pub struct IsciDeprecated(pub String);
 #[derive(Debug, serde_derive::Serialize)]
 pub struct AdID(pub String);
 
+/// Represents the UPID with type `0x05`, which the SCTE-35 standard says is deprecated.
 #[derive(serde_derive::Serialize)]
 pub struct IsanDeprecated(pub Vec<u8>);
 impl fmt::Debug for IsanDeprecated {
