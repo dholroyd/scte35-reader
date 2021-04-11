@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+<!-- next-header -->
+
+## Unreleased - FutureDate
+
 ### Fixed
  - Fixed failure to parse marker with `segmentation_descriptor()` that omits the optional `sub_segment_num` and
    `sub_segments_expected` fields.
