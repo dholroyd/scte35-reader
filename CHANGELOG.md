@@ -4,6 +4,8 @@
 
 ## Unreleased - FutureDate
 
+## 0.12.0 - 2021-04-11
+
 ### Fixed
  - Fixed failure to parse marker with `segmentation_descriptor()` that omits the optional `sub_segment_num` and
    `sub_segments_expected` fields.
