@@ -28,9 +28,9 @@
 //! | `0x0F` | _variable_ | URI | Universal Resource Identifier (see [RFC 3986](https://tools.ietf.org/html/rfc3986)). <br><br> e.g. `urn:uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6` |
 //! | `0x10` - `0xFF` | _variable_ | _Reserved_ | Reserved for future standardization. |
 
-use std::fmt;
 use hex_slice::AsHex;
 use serde::Serializer;
+use std::fmt;
 
 fn hex_tuple(name: &str, f: &mut fmt::Formatter<'_>, val: &[u8]) -> fmt::Result {
     write!(f, "{}({:02x})", name, val.plain_hex(false))
@@ -131,12 +131,12 @@ pub struct ADSInformation(pub Vec<u8>);
 pub struct Url(pub url::Url);
 impl serde::Serialize for Url {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         serializer.serialize_str(self.0.as_str())
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -147,7 +147,13 @@ mod test {
     fn umid_fmt() {
         assert_eq!(
             "Umid(00000000.11111111.22222222.33333333.44444444.55555555.66666666.77889900)",
-            format!("{:?}", Umid(hex!("0000000011111111222222223333333344444444555555556666666677889900").to_vec()))
+            format!(
+                "{:?}",
+                Umid(
+                    hex!("0000000011111111222222223333333344444444555555556666666677889900")
+                        .to_vec()
+                )
+            )
         )
     }
 }

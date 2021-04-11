@@ -81,14 +81,14 @@
 
 pub mod upid;
 
+use bitreader::BitReaderError;
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
 use serde::ser::{SerializeSeq, SerializeStruct};
 use serdebug::*;
-use std::marker;
-use bitreader::BitReaderError;
-use std::convert::TryInto;
 use smptera_format_identifiers_rust::FormatIdentifier;
+use std::convert::TryInto;
+use std::marker;
 
 /// Utility function to search the PTM section for a `CUEI` registration descriptor per
 /// _SCTE-35, section 8.1_, which indicates that streams with `stream_type` equal to the private
@@ -448,12 +448,17 @@ pub enum SegmentationUpid {
     MID(Vec<SegmentationUpid>),
     ADS(upid::ADSInformation),
     URI(upid::Url),
-    Reserved(SegmentationUpidType, Vec<u8>)
+    Reserved(SegmentationUpidType, Vec<u8>),
 }
 impl SegmentationUpid {
-    fn parse(r: &mut bitreader::BitReader<'_>, segmentation_upid_type: SegmentationUpidType, segmentation_upid_length: u8) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+    fn parse(
+        r: &mut bitreader::BitReader<'_>,
+        segmentation_upid_type: SegmentationUpidType,
+        segmentation_upid_length: u8,
+    ) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         if segmentation_upid_length > 0 {
-            let upid_result: Result<Vec<u8>, bitreader::BitReaderError> = (0..segmentation_upid_length)
+            let upid_result: Result<Vec<u8>, bitreader::BitReaderError> = (0
+                ..segmentation_upid_length)
                 .map(|_| r.read_u8(8))
                 .collect();
             let upid = upid_result.named("segmentation_descriptor.segmentation_upid")?;
@@ -464,9 +469,14 @@ impl SegmentationUpid {
     }
 
     // TODO: rework 'upid' param from Vec<u8> into &[u8]
-    fn parse_payload(segmentation_upid_type: SegmentationUpidType, upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+    fn parse_payload(
+        segmentation_upid_type: SegmentationUpidType,
+        upid: Vec<u8>,
+    ) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         match segmentation_upid_type {
-            SegmentationUpidType::NotUsed => Err(SpliceDescriptorErr::SegmentationUpidLengthTypeMismatch(segmentation_upid_type)),
+            SegmentationUpidType::NotUsed => Err(
+                SpliceDescriptorErr::SegmentationUpidLengthTypeMismatch(segmentation_upid_type),
+            ),
             SegmentationUpidType::UserDefinedDeprecated => Self::parse_user_defined(upid),
             SegmentationUpidType::ISCIDeprecated => Self::parse_isci(upid),
             SegmentationUpidType::AdID => Self::parse_adid(upid),
@@ -500,7 +510,12 @@ impl SegmentationUpid {
             SegmentationUpid::EIDR(_) => 12,
             SegmentationUpid::ATSC(atsc) => atsc.0.len(),
             SegmentationUpid::MPU(m) => m.0.len(),
-            SegmentationUpid::MID(v) => v.len()*2 + v.iter().map(|upid| upid.segmentation_upid_length() ).sum::<usize>(),
+            SegmentationUpid::MID(v) => {
+                v.len() * 2
+                    + v.iter()
+                        .map(|upid| upid.segmentation_upid_length())
+                        .sum::<usize>()
+            }
             SegmentationUpid::ADS(a) => a.0.len(),
             SegmentationUpid::URI(u) => u.0.as_str().len(),
             SegmentationUpid::Reserved(_, r) => r.len(),
@@ -529,17 +544,19 @@ impl SegmentationUpid {
     }
 
     fn parse_user_defined(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
-        Ok(SegmentationUpid::UserDefined(upid::UserDefinedDeprecated(upid)))
+        Ok(SegmentationUpid::UserDefined(upid::UserDefinedDeprecated(
+            upid,
+        )))
     }
     fn parse_isci(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         chk_upid(&upid, 8, SegmentationUpidType::ISCIDeprecated)?;
         upid_from_utf8(upid, SegmentationUpidType::ISCIDeprecated)
-            .map(|s| SegmentationUpid::Isci(upid::IsciDeprecated(s)) )
+            .map(|s| SegmentationUpid::Isci(upid::IsciDeprecated(s)))
     }
     fn parse_adid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         chk_upid(&upid, 12, SegmentationUpidType::AdID)?;
         upid_from_utf8(upid, SegmentationUpidType::AdID)
-            .map(|s| SegmentationUpid::AdID(upid::AdID(s)) )
+            .map(|s| SegmentationUpid::AdID(upid::AdID(s)))
     }
     fn parse_umid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         chk_upid(&upid, 32, SegmentationUpidType::UMID)?;
@@ -555,20 +572,20 @@ impl SegmentationUpid {
     }
     fn parse_tid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         chk_upid(&upid, 12, SegmentationUpidType::TID)?;
-        upid_from_utf8(upid, SegmentationUpidType::TID)
-            .map(|s| SegmentationUpid::TID(upid::TID(s)) )
+        upid_from_utf8(upid, SegmentationUpidType::TID).map(|s| SegmentationUpid::TID(upid::TID(s)))
     }
     fn parse_ti(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         chk_upid(&upid, 8, SegmentationUpidType::TI)?;
         Ok(SegmentationUpid::TI(upid::TI(upid)))
     }
     fn parse_adi(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
-        upid_from_utf8(upid, SegmentationUpidType::ADI)
-            .map(|s| SegmentationUpid::ADI(upid::ADI(s)) )
+        upid_from_utf8(upid, SegmentationUpidType::ADI).map(|s| SegmentationUpid::ADI(upid::ADI(s)))
     }
     fn parse_eidr(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         chk_upid(&upid, 12, SegmentationUpidType::EIDR)?;
-        Ok(SegmentationUpid::EIDR(upid::EIDR(upid.as_slice().try_into().unwrap())))
+        Ok(SegmentationUpid::EIDR(upid::EIDR(
+            upid.as_slice().try_into().unwrap(),
+        )))
     }
     fn parse_atsc(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         Ok(SegmentationUpid::ATSC(upid::ATSC(upid)))
@@ -581,7 +598,11 @@ impl SegmentationUpid {
         let mut result = vec![];
         while !data.is_empty() {
             if data.len() < 1 {
-                return Err(SpliceDescriptorErr::not_enough_data("MID.segmentation_upid_type", 1, 0));
+                return Err(SpliceDescriptorErr::not_enough_data(
+                    "MID.segmentation_upid_type",
+                    1,
+                    0,
+                ));
             }
             if data.len() < 2 {
                 return Err(SpliceDescriptorErr::not_enough_data("MID.length", 1, 0));
@@ -590,10 +611,17 @@ impl SegmentationUpid {
             let length = data[1] as usize;
             let payload_end = 2 + length;
             if data.len() < payload_end {
-                return Err(SpliceDescriptorErr::not_enough_data("MID.segmentation_upid", length, data.len() - 2));
+                return Err(SpliceDescriptorErr::not_enough_data(
+                    "MID.segmentation_upid",
+                    length,
+                    data.len() - 2,
+                ));
             }
             let payload = &data[2..payload_end];
-            result.push(Self::parse_payload(segmentation_upid_type, payload.to_vec())?);
+            result.push(Self::parse_payload(
+                segmentation_upid_type,
+                payload.to_vec(),
+            )?);
             data = &data[payload_end..];
         }
         Ok(SegmentationUpid::MID(result))
@@ -604,28 +632,45 @@ impl SegmentationUpid {
     fn parse_url(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         upid_from_utf8(upid, SegmentationUpidType::URI)
             .and_then(|s| {
-                url::Url::parse(&s).map_err(|_| SpliceDescriptorErr::InvalidUpidContent { upid_type: SegmentationUpidType::URI, bytes: s.into_bytes() } )
-            } )
-            .map(|u| SegmentationUpid::URI(upid::Url(u)) )
+                url::Url::parse(&s).map_err(|_| SpliceDescriptorErr::InvalidUpidContent {
+                    upid_type: SegmentationUpidType::URI,
+                    bytes: s.into_bytes(),
+                })
+            })
+            .map(|u| SegmentationUpid::URI(upid::Url(u)))
     }
-    fn parse_reserved(segmentation_upid_type: SegmentationUpidType, upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+    fn parse_reserved(
+        segmentation_upid_type: SegmentationUpidType,
+        upid: Vec<u8>,
+    ) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         Ok(SegmentationUpid::Reserved(segmentation_upid_type, upid))
     }
 }
 
 /// helper wrapping String::from_utf8() and producing a useful error type
-fn upid_from_utf8(upid: Vec<u8>, upid_type: SegmentationUpidType) -> Result<String, SpliceDescriptorErr> {
-    String::from_utf8(upid)
-        .map_err(|e| {
-            SpliceDescriptorErr::InvalidUpidContent { upid_type, bytes: e.into_bytes() }
-        })
+fn upid_from_utf8(
+    upid: Vec<u8>,
+    upid_type: SegmentationUpidType,
+) -> Result<String, SpliceDescriptorErr> {
+    String::from_utf8(upid).map_err(|e| SpliceDescriptorErr::InvalidUpidContent {
+        upid_type,
+        bytes: e.into_bytes(),
+    })
 }
 
-fn chk_upid(upid: &Vec<u8>, expected: usize, upid_type: SegmentationUpidType) -> Result<(), SpliceDescriptorErr> {
+fn chk_upid(
+    upid: &Vec<u8>,
+    expected: usize,
+    upid_type: SegmentationUpidType,
+) -> Result<(), SpliceDescriptorErr> {
     if upid.len() == expected {
         Ok(())
     } else {
-        Err(SpliceDescriptorErr::InvalidUpidLength { upid_type, expected, actual: upid.len() })
+        Err(SpliceDescriptorErr::InvalidUpidLength {
+            upid_type,
+            expected,
+            actual: upid.len(),
+        })
     }
 }
 
@@ -691,7 +736,7 @@ pub enum SegmentationDescriptor {
         segmentation_type_id: SegmentationTypeId,
         segment_num: u8,
         segments_expected: u8,
-        sub_segments: Option<SubSegments>
+        sub_segments: Option<SubSegments>,
     },
 }
 
@@ -748,29 +793,51 @@ impl SpliceDescriptor {
         if cancelled {
             Ok(SegmentationDescriptor::Cancel)
         } else {
-            let program_segmentation_flag = r.read_bool().named("segmentation_descriptor.program_segmentation_flag")?;
-            let segmentation_duration_flag = r.read_bool().named("segmentation_descriptor.segmentation_duration_flag")?;
-            let delivery_not_restricted_flag = r.read_bool().named("segmentation_descriptor.delivery_not_restricted_flag")?;
+            let program_segmentation_flag = r
+                .read_bool()
+                .named("segmentation_descriptor.program_segmentation_flag")?;
+            let segmentation_duration_flag = r
+                .read_bool()
+                .named("segmentation_descriptor.segmentation_duration_flag")?;
+            let delivery_not_restricted_flag = r
+                .read_bool()
+                .named("segmentation_descriptor.delivery_not_restricted_flag")?;
             let delivery_restrictions;
             if !delivery_not_restricted_flag {
                 delivery_restrictions = DeliveryRestrictionFlags::DeliveryRestrictions {
-                    web_delivery_allowed_flag: r.read_bool().named("segmentation_descriptor.web_delivery_allowed_flag")?,
-                    no_regional_blackout_flag: r.read_bool().named("segmentation_descriptor.no_regional_blackout_flag")?,
-                    archive_allowed_flag: r.read_bool().named("segmentation_descriptor.archive_allowed_flag")?,
-                    device_restrictions: DeviceRestrictions::from_bits(r.read_u8(2).named("segmentation_descriptor.device_restrictions")?),
+                    web_delivery_allowed_flag: r
+                        .read_bool()
+                        .named("segmentation_descriptor.web_delivery_allowed_flag")?,
+                    no_regional_blackout_flag: r
+                        .read_bool()
+                        .named("segmentation_descriptor.no_regional_blackout_flag")?,
+                    archive_allowed_flag: r
+                        .read_bool()
+                        .named("segmentation_descriptor.archive_allowed_flag")?,
+                    device_restrictions: DeviceRestrictions::from_bits(
+                        r.read_u8(2)
+                            .named("segmentation_descriptor.device_restrictions")?,
+                    ),
                 }
             } else {
                 delivery_restrictions = DeliveryRestrictionFlags::None;
                 r.skip(5).named("segmentation_descriptor.reserved")?;
             }
             let segmentation_mode = if !program_segmentation_flag {
-                let component_count = r.read_u8(8).named("segmentation_descriptor.component_count")?;
+                let component_count = r
+                    .read_u8(8)
+                    .named("segmentation_descriptor.component_count")?;
                 let mut components = Vec::with_capacity(component_count as usize);
 
                 for _ in 0..component_count {
-                    let component_tag = r.read_u8(8).named("segmentation_descriptor.component.component_tag")?;
-                    r.skip(7).named("segmentation_descriptor.component.reserved")?;
-                    let pts_offset = r.read_u64(33).named("segmentation_descriptor.component.pts_offset")?;
+                    let component_tag = r
+                        .read_u8(8)
+                        .named("segmentation_descriptor.component.component_tag")?;
+                    r.skip(7)
+                        .named("segmentation_descriptor.component.reserved")?;
+                    let pts_offset = r
+                        .read_u64(33)
+                        .named("segmentation_descriptor.component.pts_offset")?;
                     components.push(SegmentationModeComponent {
                         component_tag,
                         pts_offset,
@@ -783,16 +850,26 @@ impl SpliceDescriptor {
             };
 
             let segmentation_duration = if segmentation_duration_flag {
-                Some(r.read_u64(40).named("segmentation_descriptor.segmentation_duration")?)
+                Some(
+                    r.read_u64(40)
+                        .named("segmentation_descriptor.segmentation_duration")?,
+                )
             } else {
                 None
             };
 
-            let segmentation_upid_type = SegmentationUpidType::from_type(r.read_u8(8).named("segmentation_descriptor.segmentation_upid_type")?);
-            let segmentation_upid_length = r.read_u8(8).named("segmentation_descriptor.segmentation_upid_length")?;
-            let segmentation_upid = SegmentationUpid::parse(r, segmentation_upid_type, segmentation_upid_length)?;
+            let segmentation_upid_type = SegmentationUpidType::from_type(
+                r.read_u8(8)
+                    .named("segmentation_descriptor.segmentation_upid_type")?,
+            );
+            let segmentation_upid_length = r
+                .read_u8(8)
+                .named("segmentation_descriptor.segmentation_upid_length")?;
+            let segmentation_upid =
+                SegmentationUpid::parse(r, segmentation_upid_type, segmentation_upid_length)?;
 
-            let segmentation_type_id = SegmentationTypeId::from_id(r.read_u8(8).named("segmentation_type_id")?);
+            let segmentation_type_id =
+                SegmentationTypeId::from_id(r.read_u8(8).named("segmentation_type_id")?);
             let segment_num = r.read_u8(8).named("segment_num")?;
             let segments_expected = r.read_u8(8).named("segments_expected")?;
 
@@ -839,7 +916,7 @@ impl SpliceDescriptor {
         // parsing routine,
         assert!(r.is_aligned(1));
 
-        if buf.len() > (r.position()/8) as usize {
+        if buf.len() > (r.position() / 8) as usize {
             println!(
                 "SCTE35: only {} bytes consumed data in segmentation_descriptor of {} bytes",
                 r.position() / 8,
@@ -854,16 +931,15 @@ impl SpliceDescriptor {
         let preroll = r.read_u8(8).named("dtmf_descriptor.preroll")?;
         let dtmf_count = r.read_u8(3).named("dtmf_descriptor.dtmf_count")?;
         r.skip(5).named("dtmf_descriptor.reserved")?;
-        let dtmf_chars_result: Result<Vec<u8>, BitReaderError> = (0..dtmf_count)
-            .map(|_| r.read_u8(8) )
-            .collect();
+        let dtmf_chars_result: Result<Vec<u8>, BitReaderError> =
+            (0..dtmf_count).map(|_| r.read_u8(8)).collect();
         let dtmf_chars = dtmf_chars_result.named("dtmf_descriptor")?;
 
         // if we end up without reading to the end of a byte, this must indicate a bug in the
         // parsing routine,
         assert!(r.is_aligned(1));
 
-        if buf.len() > (r.position()/8) as usize {
+        if buf.len() > (r.position() / 8) as usize {
             println!(
                 "SCTE35: only {} bytes consumed data in segmentation_descriptor of {} bytes",
                 r.position() / 8,
@@ -888,7 +964,9 @@ impl SpliceDescriptor {
         let splice_descriptor_len = buf[1] as usize;
         if splice_descriptor_len < 4 {
             // descriptor must at least be big enough to hold the 4-byte id value
-            return Err(SpliceDescriptorErr::InvalidDescriptorLength(splice_descriptor_len));
+            return Err(SpliceDescriptorErr::InvalidDescriptorLength(
+                splice_descriptor_len,
+            ));
         }
         let splice_descriptor_end = splice_descriptor_len + 2;
         if splice_descriptor_end > buf.len() {
@@ -913,7 +991,11 @@ impl SpliceDescriptor {
         }
     }
 
-    fn parse_reserved(buf: &[u8], splice_descriptor_tag: u8, id: &[u8]) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
+    fn parse_reserved(
+        buf: &[u8],
+        splice_descriptor_tag: u8,
+        id: &[u8],
+    ) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
         Ok(SpliceDescriptor::Reserved {
             tag: splice_descriptor_tag,
             identifier: [id[0], id[1], id[2], id[3]],
@@ -927,7 +1009,7 @@ impl SpliceDescriptor {
                 field_name: "avail_descriptor",
                 expected: 4,
                 actual: buf.len(),
-            })
+            });
         }
         Ok(SpliceDescriptor::AvailDescriptor {
             provider_avail_id: u32::from(buf[0]) << 24
@@ -943,7 +1025,7 @@ impl SpliceDescriptor {
                 field_name: "time_descriptor",
                 expected: 12,
                 actual: buf.len(),
-            })
+            });
         }
         Ok(SpliceDescriptor::TimeDescriptor {
             tai_seconds: u64::from(buf[0]) << 40
@@ -964,17 +1046,32 @@ impl SpliceDescriptor {
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceDescriptorErr {
     InvalidDescriptorLength(usize),
-    NotEnoughData { field_name: &'static str, expected: usize, actual: usize },
+    NotEnoughData {
+        field_name: &'static str,
+        expected: usize,
+        actual: usize,
+    },
     /// The segmentation_upid_length field value was `0`, but the segmentation_upid_type value was
     /// non-`0` (as indicated by the given `SegmentationUpidType` enum variant)
     SegmentationUpidLengthTypeMismatch(SegmentationUpidType),
     /// The UPID field contained byte values that are invalid for the given UPID type
-    InvalidUpidContent { upid_type: SegmentationUpidType, bytes: Vec<u8>, },
+    InvalidUpidContent {
+        upid_type: SegmentationUpidType,
+        bytes: Vec<u8>,
+    },
     /// The UPID field had a length invalid for its type
-    InvalidUpidLength { upid_type: SegmentationUpidType, expected: usize, actual: usize },
+    InvalidUpidLength {
+        upid_type: SegmentationUpidType,
+        expected: usize,
+        actual: usize,
+    },
 }
 impl SpliceDescriptorErr {
-    fn not_enough_data(field_name: &'static str, expected: usize, actual: usize) -> SpliceDescriptorErr {
+    fn not_enough_data(
+        field_name: &'static str,
+        expected: usize,
+        actual: usize,
+    ) -> SpliceDescriptorErr {
         SpliceDescriptorErr::NotEnoughData {
             field_name,
             expected,
@@ -990,20 +1087,20 @@ impl<T> ErrorFieldNamed<T> for Result<T, bitreader::BitReaderError> {
     fn named(self, field_name: &'static str) -> Result<T, SpliceDescriptorErr> {
         match self {
             Err(bitreader::BitReaderError::NotEnoughData {
-                    position,
-                    length,
-                    requested,
-                }) => {
+                position,
+                length,
+                requested,
+            }) => {
                 // TODO: round numbers up to nearest byte,
                 Err(SpliceDescriptorErr::NotEnoughData {
                     field_name,
                     expected: (requested / 8) as usize,
                     actual: ((length - position) / 8) as usize,
                 })
-            },
+            }
             Err(e) => {
                 panic!("scte35-reader bug: {:?}", e)
-            },
+            }
             Ok(v) => Ok(v),
         }
     }
@@ -1087,7 +1184,8 @@ where
     processor: P,
     phantom: marker::PhantomData<Ctx>,
 }
-impl<P, Ctx: demultiplex::DemuxContext> psi::WholeCompactSyntaxPayloadParser for Scte35SectionProcessor<P, Ctx>
+impl<P, Ctx: demultiplex::DemuxContext> psi::WholeCompactSyntaxPayloadParser
+    for Scte35SectionProcessor<P, Ctx>
 where
     P: SpliceInfoProcessor,
 {
@@ -1194,7 +1292,9 @@ where
         let mut r = bitreader::BitReader::new(payload);
 
         let splice_event_id = r.read_u32(32).named("splice_insert.splice_event_id")?;
-        let splice_event_cancel_indicator = r.read_bool().named("splice_insert.splice_event_cancel_indicator")?;
+        let splice_event_cancel_indicator = r
+            .read_bool()
+            .named("splice_insert.splice_event_cancel_indicator")?;
         let reserved = r.read_u8(7).named("splice_insert.reserved")?;
         let result = SpliceCommand::SpliceInsert {
             splice_event_id,
@@ -1206,7 +1306,7 @@ where
         // parsing routine,
         assert!(r.is_aligned(1));
 
-        if payload.len() > (r.position()/8) as usize {
+        if payload.len() > (r.position() / 8) as usize {
             println!(
                 "SCTE35: only {} bytes consumed data in splice_insert of {} bytes",
                 r.position() / 8,
@@ -1227,7 +1327,7 @@ where
         // parsing routine,
         assert!(r.is_aligned(1));
 
-        if payload.len() > (r.position()/8) as usize {
+        if payload.len() > (r.position() / 8) as usize {
             println!(
                 "SCTE35: only {} bytes consumed data in time_signal of {} bytes",
                 r.position() / 8,
@@ -1253,10 +1353,12 @@ where
             Ok(SpliceInsert::Cancel)
         } else {
             r.relative_reader().skip(1).named("splice_insert.flags")?;
-            let network_indicator = NetworkIndicator::from_flag(r.read_u8(1).named("splice_insert.network_indicator")?);
+            let network_indicator =
+                NetworkIndicator::from_flag(r.read_u8(1).named("splice_insert.network_indicator")?);
             let program_splice_flag = r.read_bool().named("splice_insert.program_splice_flag")?;
             let duration_flag = r.read_bool().named("splice_insert.duration_flag")?;
-            let splice_immediate_flag = r.read_bool().named("splice_insert.splice_immediate_flag")?;
+            let splice_immediate_flag =
+                r.read_bool().named("splice_insert.splice_immediate_flag")?;
             r.skip(4).named("splice_insert.reserved")?;
 
             Ok(SpliceInsert::Insert {
@@ -1360,7 +1462,7 @@ mod tests {
             descriptors: SpliceDescriptors<'_>,
         ) {
             assert_eq!(header.encryption_algorithm(), EncryptionAlgorithm::None);
-            assert_matches!(command, SpliceCommand::SpliceInsert{..});
+            assert_matches!(command, SpliceCommand::SpliceInsert { .. });
             for d in &descriptors {
                 d.unwrap();
             }
@@ -1387,7 +1489,7 @@ mod tests {
             descriptors: SpliceDescriptors<'_>,
         ) {
             assert_eq!(header.encryption_algorithm(), EncryptionAlgorithm::None);
-            assert_matches!(command, SpliceCommand::TimeSignal{..});
+            assert_matches!(command, SpliceCommand::TimeSignal { .. });
             for d in &descriptors {
                 d.unwrap();
             }
@@ -1459,10 +1561,17 @@ mod tests {
         let data = hex!("480000ad7f9f0808000000002cb2d79d350200");
         let desc = SpliceDescriptor::parse_segmentation_descriptor(&data[..]).unwrap();
         match desc {
-            SpliceDescriptor::SegmentationDescriptor { descriptor_detail: SegmentationDescriptor::Insert { segmentation_upid: SegmentationUpid::TI(ti), .. }, .. } => {
+            SpliceDescriptor::SegmentationDescriptor {
+                descriptor_detail:
+                    SegmentationDescriptor::Insert {
+                        segmentation_upid: SegmentationUpid::TI(ti),
+                        ..
+                    },
+                ..
+            } => {
                 // TODO: assert_eq!(upid.len(), 8);
                 assert_eq!(ti, upid::TI(hex!("000000002cb2d79d").to_vec()));
-            },
+            }
             _ => panic!("unexpected {:?}", desc),
         };
     }
