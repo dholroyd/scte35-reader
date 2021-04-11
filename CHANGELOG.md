@@ -15,6 +15,7 @@
    struct.
  - The `segmentation_upid_type` and `segmentation_upid_length` fields of `SegmentationDescriptor::Insert` are removed
    in favor of identically named methods on the `SegmentationUpid` type
+ - Bumped `mpeg2ts-reader` to latest 0.14.0 release
 
 ### Added
  - New `upid` module containing types to represent the different classes of _Unique Program Identifier_ values
