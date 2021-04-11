@@ -1,6 +1,4 @@
-**/*.swp
 /target
 **/*.rs.bk
 Cargo.lock
-.idea
-scte35-reader.iml
+resources/
