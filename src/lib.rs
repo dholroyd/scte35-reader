@@ -79,12 +79,15 @@
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms, future_incompatible)]
 
+pub mod upid;
+
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
 use serde::ser::{SerializeSeq, SerializeStruct};
 use serdebug::*;
 use std::marker;
 use bitreader::BitReaderError;
+use std::convert::TryInto;
 
 /// Utility function to search the PTM section for a `CUEI` registration descriptor per
 /// _SCTE-35, section 8.1_, which indicates that streams with `stream_type` equal to the private
@@ -314,11 +317,13 @@ impl ReturnMode {
     }
 }
 
-#[derive(Debug, PartialEq, serde_derive::Serialize)]
+#[derive(Debug, PartialEq, serde_derive::Serialize, Copy, Clone)]
 pub enum SegmentationUpidType {
     NotUsed,
     UserDefinedDeprecated,
+    /// _Industry Standard Commercial Identifier_
     ISCIDeprecated,
+    /// Defined by the _Advertising Digital Identification_ group
     AdID,
     UMID,
     ISANDeprecated,
@@ -429,7 +434,199 @@ impl SegmentationTypeId {
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SegmentationUpid {
     None,
-    SegmentationUpid { upid: Vec<u8> },
+    UserDefined(upid::UserDefinedDeprecated),
+    Isci(upid::IsciDeprecated),
+    AdID(upid::AdID),
+    IsanDeprecated(upid::IsanDeprecated),
+    Umid(upid::Umid),
+    TID(upid::TID),
+    TI(upid::TI),
+    ADI(upid::ADI),
+    EIDR(upid::EIDR),
+    ATSC(upid::ATSC),
+    MPU(upid::MPU),
+    MID(Vec<SegmentationUpid>),
+    ADS(upid::ADSInformation),
+    URI(upid::Url),
+    Reserved(SegmentationUpidType, Vec<u8>)
+}
+impl SegmentationUpid {
+    fn parse(r: &mut bitreader::BitReader<'_>, segmentation_upid_type: SegmentationUpidType, segmentation_upid_length: u8) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        if segmentation_upid_length > 0 {
+            let upid_result: Result<Vec<u8>, bitreader::BitReaderError> = (0..segmentation_upid_length)
+                .map(|_| r.read_u8(8))
+                .collect();
+            let upid = upid_result.named("segmentation_descriptor.segmentation_upid")?;
+            SegmentationUpid::parse_payload(segmentation_upid_type, upid)
+        } else {
+            Ok(SegmentationUpid::None)
+        }
+    }
+
+    // TODO: rework 'upid' param from Vec<u8> into &[u8]
+    fn parse_payload(segmentation_upid_type: SegmentationUpidType, upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        match segmentation_upid_type {
+            SegmentationUpidType::NotUsed => Err(SpliceDescriptorErr::SegmentationUpidLengthTypeMismatch(segmentation_upid_type)),
+            SegmentationUpidType::UserDefinedDeprecated => Self::parse_user_defined(upid),
+            SegmentationUpidType::ISCIDeprecated => Self::parse_isci(upid),
+            SegmentationUpidType::AdID => Self::parse_adid(upid),
+            SegmentationUpidType::UMID => Self::parse_umid(upid),
+            SegmentationUpidType::ISANDeprecated => Self::parse_isan_deprecated(upid),
+            SegmentationUpidType::ISAN => Self::parse_isan(upid),
+            SegmentationUpidType::TID => Self::parse_tid(upid),
+            SegmentationUpidType::TI => Self::parse_ti(upid),
+            SegmentationUpidType::ADI => Self::parse_adi(upid),
+            SegmentationUpidType::EIDR => Self::parse_eidr(upid),
+            SegmentationUpidType::ATSC => Self::parse_atsc(upid),
+            SegmentationUpidType::MPU => Self::parse_mpu(upid),
+            SegmentationUpidType::MID => Self::parse_mid(upid),
+            SegmentationUpidType::ADS => Self::parse_ads(upid),
+            SegmentationUpidType::URI => Self::parse_url(upid),
+            SegmentationUpidType::Reserved(_) => Self::parse_reserved(segmentation_upid_type, upid),
+        }
+    }
+
+    pub fn segmentation_upid_length(&self) -> usize {
+        match self {
+            SegmentationUpid::None => 0,
+            SegmentationUpid::UserDefined(v) => v.0.len(),
+            SegmentationUpid::Isci(_) => 8,
+            SegmentationUpid::AdID(_) => 12,
+            SegmentationUpid::IsanDeprecated(_) => 8,
+            SegmentationUpid::Umid(_) => 32,
+            SegmentationUpid::TID(_) => 12,
+            SegmentationUpid::TI(_) => 8,
+            SegmentationUpid::ADI(adi) => adi.0.len(),
+            SegmentationUpid::EIDR(_) => 12,
+            SegmentationUpid::ATSC(atsc) => atsc.0.len(),
+            SegmentationUpid::MPU(m) => m.0.len(),
+            SegmentationUpid::MID(v) => v.len()*2 + v.iter().map(|upid| upid.segmentation_upid_length() ).sum::<usize>(),
+            SegmentationUpid::ADS(a) => a.0.len(),
+            SegmentationUpid::URI(u) => u.0.as_str().len(),
+            SegmentationUpid::Reserved(_, r) => r.len(),
+        }
+    }
+
+    pub fn segmentation_upid_type(&self) -> SegmentationUpidType {
+        match self {
+            SegmentationUpid::None => SegmentationUpidType::NotUsed,
+            SegmentationUpid::UserDefined(_) => SegmentationUpidType::UserDefinedDeprecated,
+            SegmentationUpid::Isci(_) => SegmentationUpidType::ISCIDeprecated,
+            SegmentationUpid::AdID(_) => SegmentationUpidType::AdID,
+            SegmentationUpid::IsanDeprecated(_) => SegmentationUpidType::ISAN,
+            SegmentationUpid::Umid(_) => SegmentationUpidType::UMID,
+            SegmentationUpid::TID(_) => SegmentationUpidType::TID,
+            SegmentationUpid::TI(_) => SegmentationUpidType::TI,
+            SegmentationUpid::ADI(_) => SegmentationUpidType::ADI,
+            SegmentationUpid::EIDR(_) => SegmentationUpidType::EIDR,
+            SegmentationUpid::ATSC(_) => SegmentationUpidType::ATSC,
+            SegmentationUpid::MPU(_) => SegmentationUpidType::MPU,
+            SegmentationUpid::MID(_) => SegmentationUpidType::MID,
+            SegmentationUpid::ADS(_) => SegmentationUpidType::ADS,
+            SegmentationUpid::URI(_) => SegmentationUpidType::URI,
+            SegmentationUpid::Reserved(t, _) => *t,
+        }
+    }
+
+    fn parse_user_defined(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        Ok(SegmentationUpid::UserDefined(upid::UserDefinedDeprecated(upid)))
+    }
+    fn parse_isci(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        chk_upid(&upid, 8, SegmentationUpidType::ISCIDeprecated)?;
+        upid_from_utf8(upid, SegmentationUpidType::ISCIDeprecated)
+            .map(|s| SegmentationUpid::Isci(upid::IsciDeprecated(s)) )
+    }
+    fn parse_adid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        chk_upid(&upid, 12, SegmentationUpidType::AdID)?;
+        upid_from_utf8(upid, SegmentationUpidType::AdID)
+            .map(|s| SegmentationUpid::AdID(upid::AdID(s)) )
+    }
+    fn parse_umid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        chk_upid(&upid, 32, SegmentationUpidType::UMID)?;
+        Ok(SegmentationUpid::Umid(upid::Umid(upid)))
+    }
+    fn parse_isan_deprecated(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        chk_upid(&upid, 8, SegmentationUpidType::ISANDeprecated)?;
+        Ok(SegmentationUpid::IsanDeprecated(upid::IsanDeprecated(upid)))
+    }
+    fn parse_isan(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        chk_upid(&upid, 12, SegmentationUpidType::ISAN)?;
+        Ok(SegmentationUpid::IsanDeprecated(upid::IsanDeprecated(upid)))
+    }
+    fn parse_tid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        chk_upid(&upid, 12, SegmentationUpidType::TID)?;
+        upid_from_utf8(upid, SegmentationUpidType::TID)
+            .map(|s| SegmentationUpid::TID(upid::TID(s)) )
+    }
+    fn parse_ti(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        chk_upid(&upid, 8, SegmentationUpidType::TI)?;
+        Ok(SegmentationUpid::TI(upid::TI(upid)))
+    }
+    fn parse_adi(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        upid_from_utf8(upid, SegmentationUpidType::ADI)
+            .map(|s| SegmentationUpid::ADI(upid::ADI(s)) )
+    }
+    fn parse_eidr(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        chk_upid(&upid, 12, SegmentationUpidType::EIDR)?;
+        Ok(SegmentationUpid::EIDR(upid::EIDR(upid.as_slice().try_into().unwrap())))
+    }
+    fn parse_atsc(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        Ok(SegmentationUpid::ATSC(upid::ATSC(upid)))
+    }
+    fn parse_mpu(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        Ok(SegmentationUpid::MPU(upid::MPU(upid)))
+    }
+    fn parse_mid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        let mut data = &upid[..];
+        let mut result = vec![];
+        while !data.is_empty() {
+            if data.len() < 1 {
+                return Err(SpliceDescriptorErr::not_enough_data("MID.segmentation_upid_type", 1, 0));
+            }
+            if data.len() < 2 {
+                return Err(SpliceDescriptorErr::not_enough_data("MID.length", 1, 0));
+            }
+            let segmentation_upid_type = SegmentationUpidType::from_type(data[0]);
+            let length = data[1] as usize;
+            let payload_end = 2 + length;
+            if data.len() < payload_end {
+                return Err(SpliceDescriptorErr::not_enough_data("MID.segmentation_upid", length, data.len() - 2));
+            }
+            let payload = &data[2..payload_end];
+            result.push(Self::parse_payload(segmentation_upid_type, payload.to_vec())?);
+            data = &data[payload_end..];
+        }
+        Ok(SegmentationUpid::MID(result))
+    }
+    fn parse_ads(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        Ok(SegmentationUpid::ADS(upid::ADSInformation(upid)))
+    }
+    fn parse_url(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        upid_from_utf8(upid, SegmentationUpidType::URI)
+            .and_then(|s| {
+                url::Url::parse(&s).map_err(|_| SpliceDescriptorErr::InvalidUpidContent { upid_type: SegmentationUpidType::URI, bytes: s.into_bytes() } )
+            } )
+            .map(|u| SegmentationUpid::URI(upid::Url(u)) )
+    }
+    fn parse_reserved(segmentation_upid_type: SegmentationUpidType, upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        Ok(SegmentationUpid::Reserved(segmentation_upid_type, upid))
+    }
+}
+
+/// helper wrapping String::from_utf8() and producing a useful error type
+fn upid_from_utf8(upid: Vec<u8>, upid_type: SegmentationUpidType) -> Result<String, SpliceDescriptorErr> {
+    String::from_utf8(upid)
+        .map_err(|e| {
+            SpliceDescriptorErr::InvalidUpidContent { upid_type, bytes: e.into_bytes() }
+        })
+}
+
+fn chk_upid(upid: &Vec<u8>, expected: usize, upid_type: SegmentationUpidType) -> Result<(), SpliceDescriptorErr> {
+    if upid.len() == expected {
+        Ok(())
+    } else {
+        Err(SpliceDescriptorErr::InvalidUpidLength { upid_type, expected, actual: upid.len() })
+    }
 }
 
 #[derive(Debug, serde_derive::Serialize)]
@@ -490,8 +687,6 @@ pub enum SegmentationDescriptor {
         delivery_restrictions: DeliveryRestrictionFlags,
         segmentation_mode: SegmentationMode,
         segmentation_duration: Option<u64>,
-        segmentation_upid_type: SegmentationUpidType,
-        segmentation_upid_length: u8,
         segmentation_upid: SegmentationUpid,
         segmentation_type_id: SegmentationTypeId,
         segment_num: u8,
@@ -595,15 +790,7 @@ impl SpliceDescriptor {
 
             let segmentation_upid_type = SegmentationUpidType::from_type(r.read_u8(8).named("segmentation_descriptor.segmentation_upid_type")?);
             let segmentation_upid_length = r.read_u8(8).named("segmentation_descriptor.segmentation_upid_length")?;
-            let segmentation_upid = if segmentation_upid_length > 0 {
-                let upid_result: Result<Vec<u8>, bitreader::BitReaderError> = (0..segmentation_upid_length)
-                    .map(|_| r.read_u8(8))
-                    .collect();
-                let upid = upid_result.named("segmentation_descriptor.segmentation_upid")?;
-                SegmentationUpid::SegmentationUpid { upid }
-            } else {
-                SegmentationUpid::None
-            };
+            let segmentation_upid = SegmentationUpid::parse(r, segmentation_upid_type, segmentation_upid_length)?;
 
             let segmentation_type_id = SegmentationTypeId::from_id(r.read_u8(8).named("segmentation_type_id")?);
             let segment_num = r.read_u8(8).named("segment_num")?;
@@ -612,8 +799,7 @@ impl SpliceDescriptor {
             // The spec notes: "sub_segment_num and sub_segments_expected can form an optional
             // appendix to the segmentation descriptor. The presence or absence of this optional
             // data block is determined by the descriptor loop's descriptor_length."
-            let sub_segments = if r.relative_reader().skip(1).is_ok()
-            {
+            let sub_segments = if r.relative_reader().skip(1).is_ok() {
                 Some(SubSegments {
                     sub_segment_num: r.read_u8(8).named("sub_segment_num")?,
                     sub_segments_expected: r.read_u8(8).named("sub_segments_expected")?,
@@ -629,8 +815,6 @@ impl SpliceDescriptor {
                 delivery_restrictions,
                 segmentation_mode,
                 segmentation_duration,
-                segmentation_upid_type,
-                segmentation_upid_length,
                 segmentation_upid,
                 segmentation_type_id,
                 segment_num,
@@ -781,6 +965,22 @@ impl SpliceDescriptor {
 pub enum SpliceDescriptorErr {
     InvalidDescriptorLength(usize),
     NotEnoughData { field_name: &'static str, expected: usize, actual: usize },
+    /// The segmentation_upid_length field value was `0`, but the segmentation_upid_type value was
+    /// non-`0` (as indicated by the given `SegmentationUpidType` enum variant)
+    SegmentationUpidLengthTypeMismatch(SegmentationUpidType),
+    /// The UPID field contained byte values that are invalid for the given UPID type
+    InvalidUpidContent { upid_type: SegmentationUpidType, bytes: Vec<u8>, },
+    /// The UPID field had a length invalid for its type
+    InvalidUpidLength { upid_type: SegmentationUpidType, expected: usize, actual: usize },
+}
+impl SpliceDescriptorErr {
+    fn not_enough_data(field_name: &'static str, expected: usize, actual: usize) -> SpliceDescriptorErr {
+        SpliceDescriptorErr::NotEnoughData {
+            field_name,
+            expected,
+            actual,
+        }
+    }
 }
 
 trait ErrorFieldNamed<T> {
@@ -1244,8 +1444,6 @@ mod tests {
                     delivery_restrictions: DeliveryRestrictionFlags::None,
                     segmentation_mode: SegmentationMode::Program,
                     segmentation_duration: None,
-                    segmentation_upid_type: SegmentationUpidType::NotUsed,
-                    segmentation_upid_length: 0,
                     segmentation_upid: SegmentationUpid::None,
                     segmentation_type_id: SegmentationTypeId::ProgramStart,
                     segment_num: 1,
@@ -1261,8 +1459,9 @@ mod tests {
         let data = hex!("480000ad7f9f0808000000002cb2d79d350200");
         let desc = SpliceDescriptor::parse_segmentation_descriptor(&data[..]).unwrap();
         match desc {
-            SpliceDescriptor::SegmentationDescriptor { descriptor_detail: SegmentationDescriptor::Insert { segmentation_upid: SegmentationUpid::SegmentationUpid { upid }, .. }, .. } => {
-                assert_eq!(upid.len(), 8);
+            SpliceDescriptor::SegmentationDescriptor { descriptor_detail: SegmentationDescriptor::Insert { segmentation_upid: SegmentationUpid::TI(ti), .. }, .. } => {
+                // TODO: assert_eq!(upid.len(), 8);
+                assert_eq!(ti, upid::TI(hex!("000000002cb2d79d").to_vec()));
             },
             _ => panic!("unexpected {:?}", desc),
         };

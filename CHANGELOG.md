@@ -13,6 +13,12 @@
  - As a result of fixing sub_segments field handling, the `sub_segment_num` and `sub_segments_expected` fields are
    no longer directly present in `SegmentationDescriptor::Insert`, and have moved to a new, optional `SebSegments`
    struct.
+ - The `segmentation_upid_type` and `segmentation_upid_length` fields of `SegmentationDescriptor::Insert` are removed
+   in favor of identically named methods on the `SegmentationUpid` type
+
+### Added
+ - New `upid` module containing types to represent the different classes of _Unique Program Identifier_ values
+   specified by SCTE-35
 
 ## 0.11.0
 ### Fixed
