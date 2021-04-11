@@ -10,13 +10,14 @@ license = "MIT/Apache-2.0"
 edition = "2018"
 
 [dependencies]
-mpeg2ts-reader = "0.13"
+mpeg2ts-reader = "0.14"
 bitreader = "0.3.1"
 serdebug = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 hex-slice = "0.1.4"
 url = "2.1.1"
+smptera-format-identifiers-rust = "0.3.0"
 
 [dev-dependencies]
 hex-literal = "0.2.1"
