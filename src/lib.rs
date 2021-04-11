@@ -1211,6 +1211,10 @@ where
             // trim off the 32-bit CRC
             let section_data = &section_data[..section_data.len() - 4];
             let (splice_header, rest) = SpliceInfoHeader::new(section_data);
+            if splice_header.encrypted_packet() {
+                println!("SCTE35: encrypted SCTE-35 data not supoprted");
+                return;
+            }
             //println!("splice header len={}, type={:?}", splice_header.splice_command_length(), splice_header.splice_command_type());
             let command_len = splice_header.splice_command_length() as usize;
             if command_len > rest.len() {

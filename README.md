@@ -10,6 +10,9 @@ For an example of usage, see the [scte35dump](https://github.com/dholroyd/scte35
 
 A subset of possible SCTE-35 syntax is currently handled:
 
+ - [x] `splice_info_section()`
+   - [ ] `encrypted_packet` - ❌ decryption of encrypted SCTE-35 data is not supported
+
 ### Commands
 
  - [x] `splice_null()`
