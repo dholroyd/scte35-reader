@@ -659,7 +659,7 @@ fn upid_from_utf8(
 }
 
 fn chk_upid(
-    upid: &Vec<u8>,
+    upid: &[u8],
     expected: usize,
     upid_type: SegmentationUpidType,
 ) -> Result<(), SpliceDescriptorErr> {
