@@ -91,6 +91,9 @@ use std::convert::TryInto;
 use std::marker;
 use log::error;
 
+/// The StreamType which might be used for `SCTE-35` data
+pub const SCTE35_STREAM_TYPE: mpeg2ts_reader::StreamType = mpeg2ts_reader::StreamType::Private(0x86);
+
 /// Utility function to search the PTM section for a `CUEI` registration descriptor per
 /// _SCTE-35, section 8.1_, which indicates that streams with `stream_type` equal to the private
 /// value `0x86` within this PMT section are formatted according to SCTE-35.

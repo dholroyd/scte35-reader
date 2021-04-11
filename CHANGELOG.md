@@ -4,6 +4,9 @@
 
 ## Unreleased - FutureDate
 
+### Added
+ - New `SCTE35_STREAM_TYPE` constant
+
 ## 0.12.0 - 2021-04-11
 
 ### Fixed
