@@ -89,6 +89,7 @@ use serdebug::*;
 use smptera_format_identifiers_rust::FormatIdentifier;
 use std::convert::TryInto;
 use std::marker;
+use log::error;
 
 /// Utility function to search the PTM section for a `CUEI` registration descriptor per
 /// _SCTE-35, section 8.1_, which indicates that streams with `stream_type` equal to the private
@@ -910,8 +911,8 @@ impl SpliceDescriptor {
         assert!(r.is_aligned(1));
 
         if buf.len() > (r.position() / 8) as usize {
-            println!(
-                "SCTE35: only {} bytes consumed data in segmentation_descriptor of {} bytes",
+            error!(
+                "only {} bytes consumed data in segmentation_descriptor of {} bytes",
                 r.position() / 8,
                 buf.len()
             );
@@ -933,8 +934,8 @@ impl SpliceDescriptor {
         assert!(r.is_aligned(1));
 
         if buf.len() > (r.position() / 8) as usize {
-            println!(
-                "SCTE35: only {} bytes consumed data in segmentation_descriptor of {} bytes",
+            error!(
+                "only {} bytes consumed data in segmentation_descriptor of {} bytes",
                 r.position() / 8,
                 buf.len()
             );
@@ -1195,14 +1196,14 @@ where
             if !cfg!(fuzzing) {
                 let crc = mpeg2ts_reader::mpegts_crc::sum32(data);
                 if crc != 0 {
-                    println!("SCTE35: section CRC check failed {:#08x}", crc);
+                    error!("section CRC check failed {:#08x}", crc);
                     return;
                 }
             }
             let section_data = &data[psi::SectionCommonHeader::SIZE..];
             if section_data.len() < SpliceInfoHeader::HEADER_LENGTH + 4 {
-                println!(
-                    "SCTE35: section data too short: {} (must be at least {})",
+                error!(
+                    "section data too short: {} (must be at least {})",
                     section_data.len(),
                     SpliceInfoHeader::HEADER_LENGTH + 4
                 );
@@ -1212,23 +1213,22 @@ where
             let section_data = &section_data[..section_data.len() - 4];
             let (splice_header, rest) = SpliceInfoHeader::new(section_data);
             if splice_header.encrypted_packet() {
-                println!("SCTE35: encrypted SCTE-35 data not supoprted");
+                error!("encrypted SCTE-35 data not supoprted");
                 return;
             }
-            //println!("splice header len={}, type={:?}", splice_header.splice_command_length(), splice_header.splice_command_type());
             let command_len = splice_header.splice_command_length() as usize;
             if command_len > rest.len() {
-                println!("SCTE35: splice_command_length of {} bytes is too long to fit in remaining {} bytes of section data", command_len, rest.len());
+                error!("splice_command_length of {} bytes is too long to fit in remaining {} bytes of section data", command_len, rest.len());
                 return;
             }
             let (payload, rest) = rest.split_at(command_len);
             if rest.len() < 2 {
-                println!("SCTE35: end of section data while trying to read descriptor_loop_length");
+                error!("end of section data while trying to read descriptor_loop_length");
                 return;
             }
             let descriptor_loop_length = (u16::from(rest[0]) << 8 | u16::from(rest[1])) as usize;
             if descriptor_loop_length + 2 > rest.len() {
-                println!("SCTE35: descriptor_loop_length of {} bytes is too long to fit in remaining {} bytes of section data", descriptor_loop_length, rest.len());
+                error!("descriptor_loop_length of {} bytes is too long to fit in remaining {} bytes of section data", descriptor_loop_length, rest.len());
                 return;
             }
             let descriptors = &rest[2..2 + descriptor_loop_length];
@@ -1250,18 +1250,18 @@ where
                     );
                 }
                 Some(Err(e)) => {
-                    println!("SCTE35: parse error: {:?}", e);
+                    error!("parse error: {:?}", e);
                 }
                 None => {
-                    println!(
-                        "SCTE35: unhandled command {:?}",
+                    error!(
+                        "unhandled command {:?}",
                         splice_header.splice_command_type()
                     );
                 }
             }
         } else {
-            println!(
-                "SCTE35: bad table_id for scte35: {:#x} (expected 0xfc)",
+            error!(
+                "bad table_id for scte35: {:#x} (expected 0xfc)",
                 header.table_id
             );
         }
@@ -1304,8 +1304,8 @@ where
         assert!(r.is_aligned(1));
 
         if payload.len() > (r.position() / 8) as usize {
-            println!(
-                "SCTE35: only {} bytes consumed data in splice_insert of {} bytes",
+            error!(
+                "only {} bytes consumed data in splice_insert of {} bytes",
                 r.position() / 8,
                 payload.len()
             );
@@ -1325,8 +1325,8 @@ where
         assert!(r.is_aligned(1));
 
         if payload.len() > (r.position() / 8) as usize {
-            println!(
-                "SCTE35: only {} bytes consumed data in time_signal of {} bytes",
+            error!(
+                "only {} bytes consumed data in time_signal of {} bytes",
                 r.position() / 8,
                 payload.len()
             );
