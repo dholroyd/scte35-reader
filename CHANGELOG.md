@@ -4,6 +4,9 @@
 
 ## Unreleased - FutureDate
 
+### Changed
+ - Bumped to mpeg2ts-reader 0.15 release
+
 ## 0.13.0 - 2021-04-11
 
 ### Added
