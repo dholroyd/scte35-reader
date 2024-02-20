@@ -42,5 +42,5 @@ fuzz_target!(|data: &[u8]| {
     let mut parser = Scte35SectionProcessor::new(FuzzSpliceInfoProcessor);
     let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
     let mut ctx = FuzzDemuxContext::new();
-    parser.section(&mut ctx, &header, &data[..]);
+    parser.section(&mut ctx, &header, data);
 });

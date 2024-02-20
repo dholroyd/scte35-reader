@@ -100,8 +100,8 @@ pub const SCTE35_STREAM_TYPE: mpeg2ts_reader::StreamType =
 ///
 /// Returns `true` if the descriptor is attached to the given PMT section and `false` otherwise.
 pub fn is_scte35(pmt: &mpeg2ts_reader::psi::pmt::PmtSection<'_>) -> bool {
-    for d in pmt.descriptors() {
-        if let Ok(mpeg2ts_reader::descriptor::CoreDescriptors::Registration(reg)) = d {
+    for d in pmt.descriptors().flatten() {
+        if let mpeg2ts_reader::descriptor::CoreDescriptors::Registration(reg) = d {
             if reg.is_format(FormatIdentifier::CUEI) {
                 return true;
             }
@@ -1131,10 +1131,8 @@ impl<'a> serde::Serialize for SpliceDescriptors<'a> {
         S: serde::Serializer,
     {
         let mut s = serializer.serialize_seq(None)?;
-        for e in self {
-            if let Ok(elem) = e {
-                s.serialize_element(&elem)?;
-            }
+        for elem in self.into_iter().flatten() {
+            s.serialize_element(&elem)?;
         }
         s.end()
     }
@@ -1199,11 +1197,11 @@ where
 {
     type Context = Ctx;
 
-    fn section<'a>(
+    fn section(
         &mut self,
         _ctx: &mut Self::Context,
         header: &psi::SectionCommonHeader,
-        data: &'a [u8],
+        data: &[u8],
     ) {
         if header.table_id == 0xfc {
             // no CRC while fuzz-testing, to make it more likely to find parser bugs,
