@@ -11,7 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.3"
-mpeg2ts-reader = "0.15"
+mpeg2ts-reader = "0.16.0"
 
 [dependencies.scte35-reader]
 path = ".."
