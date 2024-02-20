@@ -4,6 +4,10 @@
 
 ## Unreleased - FutureDate
 
+### Changed
+- Bumped to mpeg2ts-reader 0.16 release
+- Switched to Rust 2021 edition
+
 ## 0.14.0 - 2021-06-16
 
 ### Changed
