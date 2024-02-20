@@ -82,16 +82,17 @@
 pub mod upid;
 
 use bitreader::BitReaderError;
+use log::error;
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
 use mpeg2ts_reader::smptera::FormatIdentifier;
 use serde::ser::{SerializeSeq, SerializeStruct};
 use std::convert::TryInto;
 use std::marker;
-use log::error;
 
 /// The StreamType which might be used for `SCTE-35` data
-pub const SCTE35_STREAM_TYPE: mpeg2ts_reader::StreamType = mpeg2ts_reader::StreamType::Private(0x86);
+pub const SCTE35_STREAM_TYPE: mpeg2ts_reader::StreamType =
+    mpeg2ts_reader::StreamType::Private(0x86);
 
 /// Utility function to search the PTM section for a `CUEI` registration descriptor per
 /// _SCTE-35, section 8.1_, which indicates that streams with `stream_type` equal to the private
@@ -240,7 +241,6 @@ impl<'a> serde::Serialize for SpliceInfoHeader<'a> {
     }
 }
 impl<'a> std::fmt::Debug for SpliceInfoHeader<'a> {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = f.debug_struct("SpliceInfoHeader");
         s.field("protocol_version", &self.protocol_version());

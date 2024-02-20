@@ -1,14 +1,14 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use scte35_reader::*;
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
 use mpeg2ts_reader::psi::WholeCompactSyntaxPayloadParser;
+use scte35_reader::*;
 
 mpeg2ts_reader::demux_context!(
-        FuzzDemuxContext,
-        demultiplex::NullPacketFilter<FuzzDemuxContext>
-    );
+    FuzzDemuxContext,
+    demultiplex::NullPacketFilter<FuzzDemuxContext>
+);
 impl FuzzDemuxContext {
     fn do_construct(
         &mut self,
