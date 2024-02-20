@@ -85,7 +85,6 @@ use bitreader::BitReaderError;
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
 use serde::ser::{SerializeSeq, SerializeStruct};
-use serdebug::*;
 use smptera_format_identifiers_rust::FormatIdentifier;
 use std::convert::TryInto;
 use std::marker;
@@ -164,7 +163,6 @@ impl SpliceCommandType {
 ///
 /// This is a wrapper around a byte-slice that will extract requested fields on demand, as its
 /// methods are called.
-#[derive(SerDebug)]
 pub struct SpliceInfoHeader<'a> {
     buf: &'a [u8],
 }
@@ -239,6 +237,19 @@ impl<'a> serde::Serialize for SpliceInfoHeader<'a> {
         s.serialize_field("cw_index", &self.cw_index())?;
         s.serialize_field("tier", &self.tier())?;
         s.end()
+    }
+}
+impl<'a> std::fmt::Debug for SpliceInfoHeader<'a> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("SpliceInfoHeader");
+        s.field("protocol_version", &self.protocol_version());
+        s.field("encrypted_packet", &self.encrypted_packet());
+        s.field("encryption_algorithm", &self.encryption_algorithm());
+        s.field("pts_adjustment", &self.pts_adjustment());
+        s.field("cw_index", &self.cw_index());
+        s.field("tier", &self.tier());
+        s.finish()
     }
 }
 
