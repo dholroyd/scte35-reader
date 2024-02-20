@@ -27,11 +27,11 @@ impl SpliceInfoProcessor for FuzzSpliceInfoProcessor {
         descriptors: SpliceDescriptors<'_>,
     ) {
         // The debug implementations should call every accessor method under the hood,
-        format!("{:?}", header);
-        format!("{:?}", command);
+        std::hint::black_box(format!("{:?}", header));
+        std::hint::black_box(format!("{:?}", command));
 
         for d in &descriptors {
-            format!("{:?}", d);
+            std::hint::black_box(format!("{:?}", d));
         }
     }
 }
