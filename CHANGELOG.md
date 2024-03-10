@@ -1,8 +1,6 @@
 # Changelog
 
-<!-- next-header -->
-
-## Unreleased - FutureDate
+## Unreleased
 
 ### Changed
  - The `SpliceCommand` enum is now marked `non_exhaustive` since there may be additions to it in future.
