@@ -4,6 +4,12 @@
 
 ## Unreleased - FutureDate
 
+### Changed
+ - The `SpliceCommand` enum is now marked `non_exhaustive` since there may be additions to it in future.
+
+### Added
+ - New `private_command()` syntax support via a new `SpliceCommand::PrivateCommand` variant
+
 ## 0.15.0 - 2024-02-23
 
 ### Changed

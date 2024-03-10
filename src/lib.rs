@@ -253,6 +253,7 @@ impl<'a> std::fmt::Debug for SpliceInfoHeader<'a> {
     }
 }
 
+#[non_exhaustive]
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceCommand {
     SpliceNull {},
@@ -265,6 +266,10 @@ pub enum SpliceCommand {
         splice_time: SpliceTime,
     },
     BandwidthReservation {},
+    PrivateCommand {
+        identifier: u32,
+        private_bytes: Vec<u8>,
+    }
 }
 
 #[derive(Debug, serde_derive::Serialize)]
@@ -1251,6 +1256,7 @@ where
                 SpliceCommandType::BandwidthReservation => {
                     Some(Self::bandwidth_reservation(payload))
                 }
+                SpliceCommandType::PrivateCommand => Some(Self::private_command(payload)),
                 _ => None,
             };
             match splice_command {
@@ -1352,6 +1358,15 @@ where
         } else {
             Err(SpliceDescriptorErr::InvalidDescriptorLength(payload.len()))
         }
+    }
+
+    fn private_command(payload: &[u8]) -> Result<SpliceCommand, SpliceDescriptorErr> {
+        let mut r = bitreader::BitReader::new(payload);
+        let identifier = r.read_u32(32).named("private_command.identifier")?;
+        Ok(SpliceCommand::PrivateCommand {
+            identifier,
+            private_bytes: payload[4..].to_vec(),
+        })
     }
 
     fn read_splice_detail(
