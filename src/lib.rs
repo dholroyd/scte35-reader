@@ -1147,7 +1147,7 @@ pub struct SpliceDescriptorIter<'buf> {
     buf: &'buf [u8],
 }
 impl<'buf> SpliceDescriptorIter<'buf> {
-    fn new(buf: &'buf [u8]) -> SpliceDescriptorIter<'_> {
+    fn new(buf: &'buf [u8]) -> SpliceDescriptorIter<'buf> {
         SpliceDescriptorIter { buf }
     }
 }
