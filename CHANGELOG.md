@@ -4,6 +4,8 @@
 
 ### Changed
  - The `SpliceCommand` enum is now marked `non_exhaustive` since there may be additions to it in future.
+ - Bumped to mpeg2ts-reader 0.18.2 release, which changes the structure of the `StreamType` type used for
+   our `SCTE35_STREAM_TYPE` constant.
 
 ### Added
  - New `private_command()` syntax support via a new `SpliceCommand::PrivateCommand` variant
