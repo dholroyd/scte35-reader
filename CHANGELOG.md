@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.16.0 - 2025-01-30
+
 ### Changed
  - The `SpliceCommand` enum is now marked `non_exhaustive` since there may be additions to it in future.
  - Bumped to mpeg2ts-reader 0.18.2 release, which changes the structure of the `StreamType` type used for
