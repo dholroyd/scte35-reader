@@ -21,3 +21,7 @@ log = "0.4"
 [dev-dependencies]
 hex-literal = "0.4.1"
 matches = "0.1.6"
+
+[lints.rust]
+# per https://github.com/rust-fuzz/cargo-fuzz/issues/372
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
