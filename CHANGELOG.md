@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+ - BREAKING: `SegmentationTypeId` changed from an enum to a simple struct.  This is intended to prevent future
+   addition of a new value definition being a breaking change.
+
+### Added
+ - New `SegmentationTypeId::description()` method to provide a description similar to that in the SCTE-35 spec.
+
 ## 0.16.0 - 2025-01-30
 
 ### Changed

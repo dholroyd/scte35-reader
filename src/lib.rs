@@ -383,69 +383,74 @@ impl SegmentationUpidType {
 }
 
 #[derive(Debug, PartialEq, serde_derive::Serialize)]
-pub enum SegmentationTypeId {
-    NotIndicated,
-    ContentIdentification,
-    ProgramStart,
-    ProgramEnd,
-    ProgramEarlyTermination,
-    ProgramBreakaway,
-    ProgramResumption,
-    ProgramRunoverPlanned,
-    ProgramRunoverUnplanned,
-    ProgramOverlapStart,
-    ProgramBlackoutOverride,
-    ProgramStartInProgress,
-    ChapterStart,
-    ChapterEnd,
-    BreakStart,
-    BreakEnd,
-    ProviderAdvertisementStart,
-    ProviderAdvertisementEnd,
-    DistributorAdvertisementStart,
-    DistributorAdvertisementEnd,
-    ProviderPlacementOpportunityStart,
-    ProviderPlacementOpportunityEnd,
-    DistributorPlacementOpportunityStart,
-    DistributorPlacementOpportunityEnd,
-    UnscheduledEventStart,
-    UnscheduledEventEnd,
-    NetworkStart,
-    NetworkEnd,
-    Reserved(u8),
+pub struct SegmentationTypeId(pub u8);
+
+impl SegmentationTypeId {
+    pub const NOT_INDICATED: SegmentationTypeId = SegmentationTypeId(0);
+    pub const CONTENT_IDENTIFICATION: SegmentationTypeId = SegmentationTypeId(1);
+    pub const PROGRAM_START: SegmentationTypeId = SegmentationTypeId(16);
+    pub const PROGRAM_END: SegmentationTypeId = SegmentationTypeId(17);
+    pub const PROGRAM_EARLY_TERMINATION: SegmentationTypeId = SegmentationTypeId(18);
+    pub const PROGRAM_BREAKAWAY: SegmentationTypeId = SegmentationTypeId(19);
+    pub const PROGRAM_RESUMPTION: SegmentationTypeId = SegmentationTypeId(20);
+    pub const PROGRAM_RUNOVER_PLANNED: SegmentationTypeId = SegmentationTypeId(21);
+    pub const PROGRAM_RUNOVER_UNPLANNED: SegmentationTypeId = SegmentationTypeId(22);
+    pub const PROGRAM_OVERLAP_START: SegmentationTypeId = SegmentationTypeId(23);
+    pub const PROGRAM_BLACKOUT_OVERRIDE: SegmentationTypeId = SegmentationTypeId(24);
+    pub const PROGRAM_START_IN_PROGRESS: SegmentationTypeId = SegmentationTypeId(25);
+    pub const CHAPTER_START: SegmentationTypeId = SegmentationTypeId(32);
+    pub const CHAPTER_END: SegmentationTypeId = SegmentationTypeId(33);
+    pub const BREAK_START: SegmentationTypeId = SegmentationTypeId(34);
+    pub const BREAK_END: SegmentationTypeId = SegmentationTypeId(35);
+    pub const PROVIDER_ADVERTISEMENT_START: SegmentationTypeId = SegmentationTypeId(48);
+    pub const PROVIDER_ADVERTISEMENT_END: SegmentationTypeId = SegmentationTypeId(49);
+    pub const DISTRIBUTOR_ADVERTISEMENT_START: SegmentationTypeId = SegmentationTypeId(50);
+    pub const DISTRIBUTOR_ADVERTISEMENT_END: SegmentationTypeId = SegmentationTypeId(51);
+    pub const PROVIDER_PLACEMENT_OPPORTUNITY_START: SegmentationTypeId = SegmentationTypeId(52);
+    pub const PROVIDER_PLACEMENT_OPPORTUNITY_END: SegmentationTypeId = SegmentationTypeId(53);
+    pub const DISTRIBUTOR_PLACEMENT_OPPORTUNITY_START: SegmentationTypeId = SegmentationTypeId(54);
+    pub const DISTRIBUTOR_PLACEMENT_OPPORTUNITY_END: SegmentationTypeId = SegmentationTypeId(55);
+    pub const UNSCHEDULED_EVENT_START: SegmentationTypeId = SegmentationTypeId(64);
+    pub const UNSCHEDULED_EVENT_END: SegmentationTypeId = SegmentationTypeId(65);
+    pub const NETWORK_START: SegmentationTypeId = SegmentationTypeId(80);
+    pub const NETWORK_END: SegmentationTypeId = SegmentationTypeId(81);
 }
 impl SegmentationTypeId {
     pub fn from_id(id: u8) -> SegmentationTypeId {
-        match id {
-            0 => SegmentationTypeId::NotIndicated,
-            1 => SegmentationTypeId::ContentIdentification,
-            16 => SegmentationTypeId::ProgramStart,
-            17 => SegmentationTypeId::ProgramEnd,
-            18 => SegmentationTypeId::ProgramEarlyTermination,
-            19 => SegmentationTypeId::ProgramBreakaway,
-            20 => SegmentationTypeId::ProgramResumption,
-            21 => SegmentationTypeId::ProgramRunoverPlanned,
-            22 => SegmentationTypeId::ProgramRunoverUnplanned,
-            23 => SegmentationTypeId::ProgramOverlapStart,
-            24 => SegmentationTypeId::ProgramBlackoutOverride,
-            25 => SegmentationTypeId::ProgramStartInProgress,
-            32 => SegmentationTypeId::ChapterStart,
-            33 => SegmentationTypeId::ChapterEnd,
-            34 => SegmentationTypeId::BreakStart,
-            35 => SegmentationTypeId::BreakEnd,
-            48 => SegmentationTypeId::ProviderAdvertisementStart,
-            49 => SegmentationTypeId::ProviderAdvertisementEnd,
-            50 => SegmentationTypeId::DistributorAdvertisementStart,
-            51 => SegmentationTypeId::DistributorAdvertisementEnd,
-            52 => SegmentationTypeId::ProviderPlacementOpportunityStart,
-            53 => SegmentationTypeId::ProviderPlacementOpportunityEnd,
-            54 => SegmentationTypeId::DistributorPlacementOpportunityStart,
-            55 => SegmentationTypeId::DistributorPlacementOpportunityEnd,
-            64 => SegmentationTypeId::UnscheduledEventStart,
-            65 => SegmentationTypeId::UnscheduledEventEnd,
-            80 => SegmentationTypeId::NetworkStart,
-            81 => SegmentationTypeId::NetworkEnd,
-            _ => SegmentationTypeId::Reserved(id),
+        SegmentationTypeId(id)
+    }
+
+    pub fn description(&self) -> &'static str {
+        match *self {
+            SegmentationTypeId::NOT_INDICATED => "Not Indicated",
+            SegmentationTypeId::CONTENT_IDENTIFICATION => "Content Identification",
+            SegmentationTypeId::PROGRAM_START => "Program Start",
+            SegmentationTypeId::PROGRAM_END => "Program End",
+            SegmentationTypeId::PROGRAM_EARLY_TERMINATION => "Program Early Termination",
+            SegmentationTypeId::PROGRAM_BREAKAWAY => "Program Breakaway",
+            SegmentationTypeId::PROGRAM_RESUMPTION => "Program Resumption",
+            SegmentationTypeId::PROGRAM_RUNOVER_PLANNED => "Program Runover Planned",
+            SegmentationTypeId::PROGRAM_RUNOVER_UNPLANNED => "Program Runover Unplanned",
+            SegmentationTypeId::PROGRAM_OVERLAP_START => "Program Overlap Start",
+            SegmentationTypeId::PROGRAM_BLACKOUT_OVERRIDE => "Program Blackout Override",
+            SegmentationTypeId::PROGRAM_START_IN_PROGRESS => "Program Start In Progress",
+            SegmentationTypeId::CHAPTER_START => "Chapter Start",
+            SegmentationTypeId::CHAPTER_END => "Chapter End",
+            SegmentationTypeId::BREAK_START => "Break Start",
+            SegmentationTypeId::BREAK_END => "Break End",
+            SegmentationTypeId::PROVIDER_ADVERTISEMENT_START => "Provider Advertisement Start",
+            SegmentationTypeId::PROVIDER_ADVERTISEMENT_END => "Provider Advertisement End",
+            SegmentationTypeId::DISTRIBUTOR_ADVERTISEMENT_START => "Distributor Advertisement Start",
+            SegmentationTypeId::DISTRIBUTOR_ADVERTISEMENT_END => "Distributor Advertisement End",
+            SegmentationTypeId::PROVIDER_PLACEMENT_OPPORTUNITY_START => "Provider Placement Opportunity Start",
+            SegmentationTypeId::PROVIDER_PLACEMENT_OPPORTUNITY_END => "Provider Placement Opportunity End",
+            SegmentationTypeId::DISTRIBUTOR_PLACEMENT_OPPORTUNITY_START => "Distributor Placement Opportunity Start",
+            SegmentationTypeId::DISTRIBUTOR_PLACEMENT_OPPORTUNITY_END => "Distributor Placement Opportunity End",
+            SegmentationTypeId::UNSCHEDULED_EVENT_START => "Unscheduled Event Start",
+            SegmentationTypeId::UNSCHEDULED_EVENT_END => "Unscheduled Event End",
+            SegmentationTypeId::NETWORK_START => "Network Start",
+            SegmentationTypeId::NETWORK_END => "Network End",
+            _ => "Reserved",
         }
     }
 }
@@ -610,6 +615,7 @@ impl SegmentationUpid {
         Ok(SegmentationUpid::ATSC(upid::ATSC(upid)))
     }
     fn parse_mpu(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
+        // TODO: first 4 bytes a 'format_identifier' per https://crates.io/crates/smptera-format-identifiers-rust
         Ok(SegmentationUpid::MPU(upid::MPU(upid)))
     }
     fn parse_mid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
@@ -765,6 +771,7 @@ pub struct SpliceDuration {
 }
 
 pub trait SpliceInfoProcessor {
+    // TODO: take &mut self?
     fn process(
         &self,
         header: SpliceInfoHeader<'_>,
@@ -1570,7 +1577,7 @@ mod tests {
                     segmentation_mode: SegmentationMode::Program,
                     segmentation_duration: None,
                     segmentation_upid: SegmentationUpid::None,
-                    segmentation_type_id: SegmentationTypeId::ProgramStart,
+                    segmentation_type_id: SegmentationTypeId::PROGRAM_START,
                     segment_num: 1,
                     segments_expected: 1,
                     sub_segments: None,
