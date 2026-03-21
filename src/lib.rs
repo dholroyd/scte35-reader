@@ -311,8 +311,8 @@ pub enum SpliceTime {
 
 #[derive(Debug, serde_derive::Serialize)]
 pub struct ComponentSplice {
-    component_tag: u8,
-    splice_time: SpliceTime,
+    pub component_tag: u8,
+    pub splice_time: SpliceTime,
 }
 
 #[derive(Debug, serde_derive::Serialize)]
@@ -736,8 +736,8 @@ pub enum SegmentationMode {
 
 #[derive(Debug, serde_derive::Serialize)]
 pub struct SegmentationModeComponent {
-    component_tag: u8,
-    pts_offset: u64,
+    pub component_tag: u8,
+    pub pts_offset: u64,
 }
 
 #[derive(Debug, serde_derive::Serialize)]
@@ -760,14 +760,14 @@ pub enum SegmentationDescriptor {
 
 #[derive(Debug, serde_derive::Serialize)]
 pub struct SubSegments {
-    sub_segment_num: u8,
-    sub_segments_expected: u8,
+    pub sub_segment_num: u8,
+    pub sub_segments_expected: u8,
 }
 
 #[derive(Debug, serde_derive::Serialize)]
 pub struct SpliceDuration {
-    return_mode: ReturnMode,
-    duration: u64,
+    pub return_mode: ReturnMode,
+    pub duration: u64,
 }
 
 pub trait SpliceInfoProcessor {
