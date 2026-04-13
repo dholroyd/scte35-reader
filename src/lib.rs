@@ -82,7 +82,6 @@
 pub mod upid;
 
 use bitreader::BitReaderError;
-use log::error;
 use mpeg2ts_reader::demultiplex;
 use mpeg2ts_reader::psi;
 use mpeg2ts_reader::smptera::FormatIdentifier;
@@ -778,6 +777,11 @@ pub trait SpliceInfoProcessor {
         command: SpliceCommand,
         descriptors: SpliceDescriptors<'_>,
     );
+
+    /// Called when a SCTE-35 section could not be parsed.  The default implementation
+    /// silently drops the error; override this to surface failures to your application
+    /// (for example, by logging them).
+    fn error(&self, _err: Scte35Error) {}
 }
 
 #[derive(Debug, serde_derive::Serialize)]
@@ -936,11 +940,11 @@ impl SpliceDescriptor {
         assert!(r.is_aligned(1));
 
         if buf.len() > (r.position() / 8) as usize {
-            error!(
-                "only {} bytes consumed data in segmentation_descriptor of {} bytes",
-                r.position() / 8,
-                buf.len()
-            );
+            return Err(SpliceDescriptorErr::LeftoverData {
+                field_name: "segmentation_descriptor",
+                consumed: (r.position() / 8) as usize,
+                total: buf.len(),
+            });
         }
         Ok(result)
     }
@@ -959,11 +963,11 @@ impl SpliceDescriptor {
         assert!(r.is_aligned(1));
 
         if buf.len() > (r.position() / 8) as usize {
-            error!(
-                "only {} bytes consumed data in segmentation_descriptor of {} bytes",
-                r.position() / 8,
-                buf.len()
-            );
+            return Err(SpliceDescriptorErr::LeftoverData {
+                field_name: "dtmf_descriptor",
+                consumed: (r.position() / 8) as usize,
+                total: buf.len(),
+            });
         }
 
         Ok(SpliceDescriptor::DTMFDescriptor {
@@ -1084,7 +1088,41 @@ pub enum SpliceDescriptorErr {
         expected: usize,
         actual: usize,
     },
+    /// The parser consumed fewer bytes than the enclosing field contained, which indicates
+    /// either a bug in this crate or malformed input data.
+    LeftoverData {
+        field_name: &'static str,
+        consumed: usize,
+        total: usize,
+    },
 }
+/// Reports failures encountered while parsing a SCTE-35 section.  These are delivered
+/// to the caller via [`SpliceInfoProcessor::error`] since the underlying `psi` trait method
+/// driving section processing does not return a `Result`.
+#[derive(Debug)]
+pub enum Scte35Error {
+    /// The section header carried an unexpected `table_id` value (expected `0xfc`).
+    BadTableId(u8),
+    /// The section's CRC check did not match the expected value of zero.
+    CrcFailed(u32),
+    /// The section was too short to contain a valid `splice_info_section`.
+    SectionTooShort { actual: usize, minimum: usize },
+    /// The section's `encrypted_packet` flag was set; this crate does not support
+    /// decrypting SCTE-35 payloads.
+    EncryptedNotSupported,
+    /// The `splice_command_length` field named more bytes than remained in the section.
+    SpliceCommandLengthTooLong { command_len: usize, remaining: usize },
+    /// The section ended before the two-byte `descriptor_loop_length` field could be read.
+    DescriptorLoopLengthShort,
+    /// The `descriptor_loop_length` field named more bytes than remained in the section.
+    DescriptorLoopLengthTooLong { length: usize, remaining: usize },
+    /// The section carried a `splice_command_type` value that this crate does not (yet)
+    /// know how to parse.
+    UnhandledCommand(SpliceCommandType),
+    /// The splice command payload could not be parsed.
+    ParseError(SpliceDescriptorErr),
+}
+
 impl SpliceDescriptorErr {
     fn not_enough_data(
         field_name: &'static str,
@@ -1219,39 +1257,44 @@ where
             if !cfg!(fuzzing) {
                 let crc = mpeg2ts_reader::mpegts_crc::sum32(data);
                 if crc != 0 {
-                    error!("section CRC check failed {:#08x}", crc);
+                    self.processor.error(Scte35Error::CrcFailed(crc));
                     return;
                 }
             }
             let section_data = &data[psi::SectionCommonHeader::SIZE..];
             if section_data.len() < SpliceInfoHeader::HEADER_LENGTH + 4 {
-                error!(
-                    "section data too short: {} (must be at least {})",
-                    section_data.len(),
-                    SpliceInfoHeader::HEADER_LENGTH + 4
-                );
+                self.processor.error(Scte35Error::SectionTooShort {
+                    actual: section_data.len(),
+                    minimum: SpliceInfoHeader::HEADER_LENGTH + 4,
+                });
                 return;
             }
             // trim off the 32-bit CRC
             let section_data = &section_data[..section_data.len() - 4];
             let (splice_header, rest) = SpliceInfoHeader::new(section_data);
             if splice_header.encrypted_packet() {
-                error!("encrypted SCTE-35 data not supoprted");
+                self.processor.error(Scte35Error::EncryptedNotSupported);
                 return;
             }
             let command_len = splice_header.splice_command_length() as usize;
             if command_len > rest.len() {
-                error!("splice_command_length of {} bytes is too long to fit in remaining {} bytes of section data", command_len, rest.len());
+                self.processor.error(Scte35Error::SpliceCommandLengthTooLong {
+                    command_len,
+                    remaining: rest.len(),
+                });
                 return;
             }
             let (payload, rest) = rest.split_at(command_len);
             if rest.len() < 2 {
-                error!("end of section data while trying to read descriptor_loop_length");
+                self.processor.error(Scte35Error::DescriptorLoopLengthShort);
                 return;
             }
             let descriptor_loop_length = (u16::from(rest[0]) << 8 | u16::from(rest[1])) as usize;
             if descriptor_loop_length + 2 > rest.len() {
-                error!("descriptor_loop_length of {} bytes is too long to fit in remaining {} bytes of section data", descriptor_loop_length, rest.len());
+                self.processor.error(Scte35Error::DescriptorLoopLengthTooLong {
+                    length: descriptor_loop_length,
+                    remaining: rest.len(),
+                });
                 return;
             }
             let descriptors = &rest[2..2 + descriptor_loop_length];
@@ -1274,20 +1317,16 @@ where
                     );
                 }
                 Some(Err(e)) => {
-                    error!("parse error: {:?}", e);
+                    self.processor.error(Scte35Error::ParseError(e));
                 }
                 None => {
-                    error!(
-                        "unhandled command {:?}",
-                        splice_header.splice_command_type()
-                    );
+                    self.processor.error(Scte35Error::UnhandledCommand(
+                        splice_header.splice_command_type(),
+                    ));
                 }
             }
         } else {
-            error!(
-                "bad table_id for scte35: {:#x} (expected 0xfc)",
-                header.table_id
-            );
+            self.processor.error(Scte35Error::BadTableId(header.table_id));
         }
     }
 }
@@ -1328,11 +1367,11 @@ where
         assert!(r.is_aligned(1));
 
         if payload.len() > (r.position() / 8) as usize {
-            error!(
-                "only {} bytes consumed data in splice_insert of {} bytes",
-                r.position() / 8,
-                payload.len()
-            );
+            return Err(SpliceDescriptorErr::LeftoverData {
+                field_name: "splice_insert",
+                consumed: (r.position() / 8) as usize,
+                total: payload.len(),
+            });
         }
         Ok(result)
     }
@@ -1349,11 +1388,11 @@ where
         assert!(r.is_aligned(1));
 
         if payload.len() > (r.position() / 8) as usize {
-            error!(
-                "only {} bytes consumed data in time_signal of {} bytes",
-                r.position() / 8,
-                payload.len()
-            );
+            return Err(SpliceDescriptorErr::LeftoverData {
+                field_name: "time_signal",
+                consumed: (r.position() / 8) as usize,
+                total: payload.len(),
+            });
         }
         Ok(result)
     }
@@ -1616,8 +1655,64 @@ mod tests {
 
     #[test]
     fn too_large_segment_descriptor() {
-        // there are more bytes than expected; this should not panic
+        // there are more bytes than expected; this should not panic, and the parser
+        // should now report LeftoverData rather than silently accepting the extra bytes.
         let data = hex!("480000ad7f9f0808000000002cb2d79d350200000000");
-        SpliceDescriptor::parse_segmentation_descriptor(&data[..]).unwrap();
+        assert_matches!(
+            SpliceDescriptor::parse_segmentation_descriptor(&data[..]),
+            Err(SpliceDescriptorErr::LeftoverData {
+                field_name: "segmentation_descriptor",
+                ..
+            })
+        );
+    }
+
+    #[derive(Default)]
+    struct RecordingProcessor {
+        errors: std::cell::RefCell<Vec<String>>,
+    }
+    impl SpliceInfoProcessor for RecordingProcessor {
+        fn process(
+            &self,
+            _header: SpliceInfoHeader<'_>,
+            _command: SpliceCommand,
+            _descriptors: SpliceDescriptors<'_>,
+        ) {
+            panic!("process() should not be called for these error-path tests");
+        }
+        fn error(&self, err: Scte35Error) {
+            self.errors.borrow_mut().push(format!("{:?}", err));
+        }
+    }
+
+    fn run_section(data: &[u8]) -> Vec<String> {
+        let processor = RecordingProcessor::default();
+        let mut parser = Scte35SectionProcessor::new(processor);
+        let header = psi::SectionCommonHeader::new(&data[..psi::SectionCommonHeader::SIZE]);
+        let mut ctx = NullDemuxContext::new();
+        parser.section(&mut ctx, &header, data);
+        parser.processor.errors.into_inner()
+    }
+
+    #[test]
+    fn error_callback_bad_table_id() {
+        // same payload as it_works but with table_id changed from 0xfc to 0xfd
+        let data = hex!(
+            "fd302500000000000000fff01405000000017feffe2d142b00fe0123d3080001010100007f157a49"
+        );
+        let errors = run_section(&data[..]);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].starts_with("BadTableId"), "got: {}", errors[0]);
+    }
+
+    #[test]
+    fn error_callback_crc_failed() {
+        // same payload as it_works but with the final CRC byte corrupted
+        let data = hex!(
+            "fc302500000000000000fff01405000000017feffe2d142b00fe0123d3080001010100007f157a4a"
+        );
+        let errors = run_section(&data[..]);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].starts_with("CrcFailed"), "got: {}", errors[0]);
     }
 }

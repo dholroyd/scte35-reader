@@ -5,10 +5,22 @@
 ### Changed
  - BREAKING: `SegmentationTypeId` changed from an enum to a simple struct.  This is intended to prevent future
    addition of a new value definition being a breaking change.
+ - BREAKING: Cases where a descriptor or command contained unconsumed trailing bytes now return
+   `Err(SpliceDescriptorErr::LeftoverData)` instead of logging and continuing.
+ - Replaced all `log::error!()` calls with a new `SpliceInfoProcessor::error()` callback and a structured
+   `Scte35Error` enum.  Callers that relied on the log output must now override the `error()` method to
+   get equivalent behaviour.
  - Fields of `ComponentSplice`, `SegmentationModeComponent`, `SubSegments` and `SpliceDuration` are now `pub`.
 
 ### Added
  - New `SegmentationTypeId::description()` method to provide a description similar to that in the SCTE-35 spec.
+ - New `Scte35Error` enum covering all parse-time failure cases (bad table ID, CRC failure, short sections,
+   encrypted payloads, oversized lengths, unhandled commands, and inner parse errors).
+ - New default-no-op `SpliceInfoProcessor::error()` method for receiving structured parse errors.
+ - New `SpliceDescriptorErr::LeftoverData` variant for descriptors/commands with unconsumed trailing bytes.
+
+### Removed
+ - Removed the `log` crate dependency.
 
 ## 0.16.0 - 2025-01-30
 
