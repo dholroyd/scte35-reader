@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Changed
+ - BREAKING: `SpliceCommand::PrivateCommand::identifier` changed from `u32` to `FormatIdentifier`
+   (from the `smptera-format-identifiers-rust` crate, re-exported via `mpeg2ts_reader::smptera`).
+ - BREAKING: `SpliceDescriptor::Reserved::identifier` changed from `[u8; 4]` to `FormatIdentifier`.
+ - BREAKING: `upid::MPU` changed from a tuple struct `MPU(Vec<u8>)` to a struct with
+   `format_identifier: FormatIdentifier` and `private_data: Vec<u8>` fields, matching the spec's
+   `MPU()` syntax (SCTE 35, Table 24).
  - BREAKING: `SegmentationTypeId` changed from an enum to a simple struct.  This is intended to prevent future
    addition of a new value definition being a breaking change.
  - BREAKING: Cases where a descriptor or command contained unconsumed trailing bytes now return

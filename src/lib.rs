@@ -270,6 +270,13 @@ impl<'a> std::fmt::Debug for SpliceInfoHeader<'a> {
     }
 }
 
+fn serialize_format_identifier<S>(id: &FormatIdentifier, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.collect_str(&id.0)
+}
+
 /// Parsed _splice-command_ from a _splice_info_section_.
 #[non_exhaustive]
 #[derive(Debug, serde_derive::Serialize)]
@@ -294,8 +301,10 @@ pub enum SpliceCommand {
     BandwidthReservation {},
     /// A user-defined private command.
     PrivateCommand {
-        /// 32-bit format identifier registered by the owner of this private command.
-        identifier: u32,
+        /// 32-bit format identifier registered with the SMPTE Registration Authority by the
+        /// owner of this private command.
+        #[serde(serialize_with = "serialize_format_identifier")]
+        identifier: FormatIdentifier,
         /// The private command payload bytes.
         private_bytes: Vec<u8>,
     }
@@ -663,7 +672,7 @@ impl SegmentationUpid {
             SegmentationUpid::ADI(adi) => adi.0.len(),
             SegmentationUpid::EIDR(_) => 12,
             SegmentationUpid::ATSC(atsc) => atsc.0.len(),
-            SegmentationUpid::MPU(m) => m.0.len(),
+            SegmentationUpid::MPU(m) => 4 + m.private_data.len(),
             SegmentationUpid::MID(v) => {
                 v.len() * 2
                     + v.iter()
@@ -746,8 +755,19 @@ impl SegmentationUpid {
         Ok(SegmentationUpid::ATSC(upid::ATSC(upid)))
     }
     fn parse_mpu(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
-        // TODO: first 4 bytes a 'format_identifier' per https://crates.io/crates/smptera-format-identifiers-rust
-        Ok(SegmentationUpid::MPU(upid::MPU(upid)))
+        if upid.len() < 4 {
+            return Err(SpliceDescriptorErr::not_enough_data(
+                "MPU.format_identifier",
+                4,
+                upid.len(),
+            ));
+        }
+        let format_identifier = FormatIdentifier::from(&upid[..4]);
+        let private_data = upid[4..].to_vec();
+        Ok(SegmentationUpid::MPU(upid::MPU {
+            format_identifier,
+            private_data,
+        }))
     }
     fn parse_mid(upid: Vec<u8>) -> Result<SegmentationUpid, SpliceDescriptorErr> {
         let mut data = &upid[..];
@@ -993,8 +1013,9 @@ pub enum SpliceDescriptor {
     Reserved {
         /// The `splice_descriptor_tag` byte.
         tag: u8,
-        /// The 32-bit identifier field.
-        identifier: [u8; 4],
+        /// The 32-bit format identifier registered with the SMPTE Registration Authority.
+        #[serde(serialize_with = "serialize_format_identifier")]
+        identifier: FormatIdentifier,
         /// The remaining private payload bytes.
         private_bytes: Vec<u8>,
     },
@@ -1190,9 +1211,9 @@ impl SpliceDescriptor {
                 expected: splice_descriptor_end,
             });
         }
-        let id = &buf[2..6];
+        let id = FormatIdentifier::from(&buf[2..6]);
         let payload = &buf[6..splice_descriptor_end];
-        if id == b"CUEI" {
+        if id == FormatIdentifier::CUEI {
             match splice_descriptor_tag {
                 0x00 => Self::parse_avail_descriptor(payload),
                 0x01 => Self::parse_dtmf_descriptor(payload),
@@ -1208,11 +1229,11 @@ impl SpliceDescriptor {
     fn parse_reserved(
         buf: &[u8],
         splice_descriptor_tag: u8,
-        id: &[u8],
+        id: FormatIdentifier,
     ) -> Result<SpliceDescriptor, SpliceDescriptorErr> {
         Ok(SpliceDescriptor::Reserved {
             tag: splice_descriptor_tag,
-            identifier: [id[0], id[1], id[2], id[3]],
+            identifier: id,
             private_bytes: buf.to_owned(),
         })
     }
@@ -1633,10 +1654,15 @@ where
     }
 
     fn private_command(payload: &[u8]) -> Result<SpliceCommand, SpliceDescriptorErr> {
-        let mut r = bitreader::BitReader::new(payload);
-        let identifier = r.read_u32(32).named("private_command.identifier")?;
+        if payload.len() < 4 {
+            return Err(SpliceDescriptorErr::not_enough_data(
+                "private_command.identifier",
+                4,
+                payload.len(),
+            ));
+        }
         Ok(SpliceCommand::PrivateCommand {
-            identifier,
+            identifier: FormatIdentifier::from(&payload[..4]),
             private_bytes: payload[4..].to_vec(),
         })
     }
@@ -1821,11 +1847,12 @@ mod tests {
             Err(SpliceDescriptorErr::InvalidDescriptorLength { .. })
         );
         let data = hex!("01084D59494400000003");
+        const MYID: FormatIdentifier = FormatIdentifier(four_cc::FourCC(*b"MYID"));
         assert_matches!(
             SpliceDescriptor::parse(&data[..]),
             Ok(SpliceDescriptor::Reserved {
                 tag: 01,
-                identifier: [0x4D, 0x59, 0x49, 0x44],
+                identifier: MYID,
                 private_bytes: _,
             })
         );

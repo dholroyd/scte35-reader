@@ -116,12 +116,28 @@ impl fmt::Debug for ATSC {
 }
 
 /// _Managed Private UPID_ structure
+///
+/// The first 4 bytes are a `format_identifier` registered with the SMPTE Registration Authority,
+/// and the remaining bytes are `private_data` defined by the registered owner of the identifier.
 #[derive(serde_derive::Serialize)]
-pub struct MPU(pub Vec<u8>);
+pub struct MPU {
+    /// 32-bit format identifier registered with the SMPTE Registration Authority.
+    #[serde(serialize_with = "serialize_format_identifier")]
+    pub format_identifier: mpeg2ts_reader::smptera::FormatIdentifier,
+    /// Private data defined by the registered owner of the format identifier.
+    pub private_data: Vec<u8>,
+}
 impl fmt::Debug for MPU {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        hex_tuple("MPU", f, &self.0)
+        write!(f, "MPU({:?}, {:02x})", self.format_identifier, self.private_data.plain_hex(false))
     }
+}
+
+fn serialize_format_identifier<S>(id: &mpeg2ts_reader::smptera::FormatIdentifier, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.collect_str(&id.0)
 }
 
 /// _Advertising Information_ (SCTE-35 does not specify the format)

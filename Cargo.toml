@@ -18,6 +18,7 @@ hex-slice = "0.1.4"
 url = "2.1.1"
 
 [dev-dependencies]
+four-cc = "0.3.0"
 hex-literal = "0.4.1"
 matches = "0.1.6"
 
