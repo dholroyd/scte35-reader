@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 //! Parser data formatted according to
 //! [SCTE-35](http://www.scte.org/SCTEDocs/Standards/SCTE%2035%202016.pdf).
 //!
@@ -107,16 +109,24 @@ pub fn is_scte35(pmt: &mpeg2ts_reader::psi::pmt::PmtSection<'_>) -> bool {
     }
     false
 }
+/// Encryption algorithm applied to portions of a _splice_info_section_.
 #[derive(Debug, PartialEq, serde_derive::Serialize)]
 pub enum EncryptionAlgorithm {
+    /// No encryption.
     None,
+    /// DES in Electronic Code Book (ECB) mode.
     DesEcb,
+    /// DES in Cipher Block Chaining (CBC) mode.
     DesCbc,
+    /// Triple DES (EDE3) in ECB mode.
     TripleDesEde3Ecb,
+    /// Reserved algorithm identifier.
     Reserved(u8),
+    /// User-private algorithm identifier.
     Private(u8),
 }
 impl EncryptionAlgorithm {
+    /// Returns the `EncryptionAlgorithm` variant corresponding to the given identifier byte.
     pub fn from_id(id: u8) -> EncryptionAlgorithm {
         match id {
             0 => EncryptionAlgorithm::None,
@@ -134,17 +144,26 @@ impl EncryptionAlgorithm {
     }
 }
 
+/// Identifies the type of _splice-command_ present in a _splice_info_section_.
 #[derive(Debug, PartialEq, serde_derive::Serialize)]
 pub enum SpliceCommandType {
+    /// A `splice_null` command.
     SpliceNull,
+    /// A reserved or unrecognised command type.
     Reserved(u8),
+    /// A `splice_schedule` command.
     SpliceSchedule,
+    /// A `splice_insert` command.
     SpliceInsert,
+    /// A `time_signal` command.
     TimeSignal,
+    /// A `bandwidth_reservation` command.
     BandwidthReservation,
+    /// A `private_command`.
     PrivateCommand,
 }
 impl SpliceCommandType {
+    /// Returns the `SpliceCommandType` variant corresponding to the given identifier byte.
     pub fn from_id(id: u8) -> SpliceCommandType {
         match id {
             0x00 => SpliceCommandType::SpliceNull,
@@ -251,28 +270,43 @@ impl<'a> std::fmt::Debug for SpliceInfoHeader<'a> {
     }
 }
 
+/// Parsed _splice-command_ from a _splice_info_section_.
 #[non_exhaustive]
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceCommand {
+    /// A no-op command.
     SpliceNull {},
+    /// A request to insert a splice point.
     SpliceInsert {
+        /// Unique identifier for this splice event.
         splice_event_id: u32,
+        /// Reserved bits.
         reserved: u8,
+        /// Details of the splice event, or cancellation.
         splice_detail: SpliceInsert,
     },
+    /// A time signal carrying a PTS timestamp.
     TimeSignal {
+        /// The splice time conveyed by this command.
         splice_time: SpliceTime,
     },
+    /// A bandwidth reservation command (carries no additional data).
     BandwidthReservation {},
+    /// A user-defined private command.
     PrivateCommand {
+        /// 32-bit format identifier registered by the owner of this private command.
         identifier: u32,
+        /// The private command payload bytes.
         private_bytes: Vec<u8>,
     }
 }
 
+/// Indicates whether the splice point is an out-of-network or in-to-network transition.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum NetworkIndicator {
+    /// Splice out of the network (e.g. to an ad break).
     Out,
+    /// Splice back into the network.
     In,
 }
 impl NetworkIndicator {
@@ -289,43 +323,69 @@ impl NetworkIndicator {
     }
 }
 
+/// Detail of a `splice_insert` command: either a cancellation or an insertion with full parameters.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceInsert {
+    /// The previously-announced splice event has been cancelled.
     Cancel,
+    /// A splice point insertion.
     Insert {
+        /// Whether this is an out-of-network or in-to-network splice.
         network_indicator: NetworkIndicator,
+        /// Program-level or component-level splice mode.
         splice_mode: SpliceMode,
+        /// Optional break duration.
         duration: Option<SpliceDuration>,
+        /// Unique identifier for the viewing event.
         unique_program_id: u16,
+        /// Identification of a specific avail within this viewing event.
         avail_num: u8,
+        /// Expected number of avails within this viewing event.
         avails_expected: u8,
     },
 }
 
+/// Indicates the time of a splice point.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceTime {
+    /// The `splice_immediate_flag` was set in the `splice_insert` command — no `splice_time()`
+    /// structure is present in the bitstream.
     Immediate,
+    /// A `splice_time()` structure was present.  Contains `Some(pts)` when
+    /// `time_specified_flag` was set, or `None` when it was not (no PTS value given).
     Timed(Option<u64>),
 }
 
+/// A per-component splice point within a component-mode splice.
 #[derive(Debug, serde_derive::Serialize)]
 pub struct ComponentSplice {
+    /// Identifies the elementary stream component.  This value matches a
+    /// `component_tag` value carried in the PMT's `stream_identifier_descriptor`
+    /// for the corresponding elementary stream.
     pub component_tag: u8,
+    /// The splice time for this component.
     pub splice_time: SpliceTime,
 }
 
+/// Whether a splice applies to the whole program or to individual components.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceMode {
+    /// Program-level splice: all components share a single splice time.
     Program(SpliceTime),
+    /// Component-level splice: each listed component has its own splice time.
     Components(Vec<ComponentSplice>),
 }
 
+/// Whether return from the break is automatic or manual.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum ReturnMode {
+    /// The splicer automatically returns to the network feed after the break duration elapses.
     Automatic,
+    /// A subsequent splice command is required to return to the network feed.
     Manual,
 }
 impl ReturnMode {
+    /// Returns the `ReturnMode` corresponding to the `auto_return` flag value.
     pub fn from_flag(flag: u8) -> ReturnMode {
         match flag {
             0 => ReturnMode::Manual,
@@ -335,29 +395,46 @@ impl ReturnMode {
     }
 }
 
+/// Identifies the type of _Segmentation UPID_ carried in a `segmentation_descriptor`.
 #[derive(Debug, PartialEq, serde_derive::Serialize, Copy, Clone)]
 pub enum SegmentationUpidType {
+    /// No UPID present (`0x00`).
     NotUsed,
+    /// Deprecated user-defined UPID (`0x01`).
     UserDefinedDeprecated,
-    /// _Industry Standard Commercial Identifier_
+    /// _Industry Standard Commercial Identifier_ (deprecated, `0x02`).
     ISCIDeprecated,
-    /// Defined by the _Advertising Digital Identification_ group
+    /// Defined by the _Advertising Digital Identification_ group (`0x03`).
     AdID,
+    /// SMPTE UMID (`0x04`).
     UMID,
+    /// Deprecated ISAN (`0x05`).
     ISANDeprecated,
+    /// Versioned ISAN per ISO 15706-2 (`0x06`).
     ISAN,
+    /// Tribune Media Systems Program identifier (`0x07`).
     TID,
+    /// AiringID, formerly Turner ID (`0x08`).
     TI,
+    /// CableLabs metadata identifier (`0x09`).
     ADI,
+    /// Entertainment ID Registry Association identifier (`0x0A`).
     EIDR,
+    /// ATSC content identifier (`0x0B`).
     ATSC,
+    /// Managed Private UPID (`0x0C`).
     MPU,
+    /// Multiple UPID structure (`0x0D`).
     MID,
+    /// Advertising information (`0x0E`).
     ADS,
+    /// Universal Resource Identifier (`0x0F`).
     URI,
+    /// Reserved for future standardisation.
     Reserved(u8),
 }
 impl SegmentationUpidType {
+    /// Returns the `SegmentationUpidType` variant for the given `segmentation_upid_type` byte.
     pub fn from_type(id: u8) -> SegmentationUpidType {
         match id {
             0 => SegmentationUpidType::NotUsed,
@@ -381,44 +458,77 @@ impl SegmentationUpidType {
     }
 }
 
+/// Identifies the segmentation type in a `segmentation_descriptor`.
+///
+/// Named constants are provided for the well-known values defined in SCTE-35 Table 22.
 #[derive(Debug, PartialEq, serde_derive::Serialize)]
 pub struct SegmentationTypeId(pub u8);
 
 impl SegmentationTypeId {
+    /// No segmentation type specified (`0x00`).
     pub const NOT_INDICATED: SegmentationTypeId = SegmentationTypeId(0);
+    /// Identifies content without signaling a segmentation point (`0x01`).
     pub const CONTENT_IDENTIFICATION: SegmentationTypeId = SegmentationTypeId(1);
+    /// Marks the beginning of a program (`0x10`).
     pub const PROGRAM_START: SegmentationTypeId = SegmentationTypeId(16);
+    /// Marks the end of a program (`0x11`).
     pub const PROGRAM_END: SegmentationTypeId = SegmentationTypeId(17);
+    /// The program ended earlier than its scheduled end time (`0x12`).
     pub const PROGRAM_EARLY_TERMINATION: SegmentationTypeId = SegmentationTypeId(18);
+    /// Temporary departure from the scheduled program to unscheduled content (`0x13`).
     pub const PROGRAM_BREAKAWAY: SegmentationTypeId = SegmentationTypeId(19);
+    /// Return to the scheduled program after a breakaway (`0x14`).
     pub const PROGRAM_RESUMPTION: SegmentationTypeId = SegmentationTypeId(20);
+    /// The program has run past its scheduled end time, and the overrun was expected (`0x15`).
     pub const PROGRAM_RUNOVER_PLANNED: SegmentationTypeId = SegmentationTypeId(21);
+    /// The program has run past its scheduled end time unexpectedly (`0x16`).
     pub const PROGRAM_RUNOVER_UNPLANNED: SegmentationTypeId = SegmentationTypeId(22);
+    /// Start of content that overlaps with the previous or next program (`0x17`).
     pub const PROGRAM_OVERLAP_START: SegmentationTypeId = SegmentationTypeId(23);
+    /// Overrides a blackout applied to the current program (`0x18`).
     pub const PROGRAM_BLACKOUT_OVERRIDE: SegmentationTypeId = SegmentationTypeId(24);
+    /// Joining a program that is already in progress (`0x19`).
     pub const PROGRAM_START_IN_PROGRESS: SegmentationTypeId = SegmentationTypeId(25);
+    /// Start of a chapter within a program (`0x20`).
     pub const CHAPTER_START: SegmentationTypeId = SegmentationTypeId(32);
+    /// End of a chapter within a program (`0x21`).
     pub const CHAPTER_END: SegmentationTypeId = SegmentationTypeId(33);
+    /// Start of a break within a program (e.g. commercial break, `0x22`).
     pub const BREAK_START: SegmentationTypeId = SegmentationTypeId(34);
+    /// End of a break within a program (`0x23`).
     pub const BREAK_END: SegmentationTypeId = SegmentationTypeId(35);
+    /// Start of an advertisement placed by the content provider (`0x30`).
     pub const PROVIDER_ADVERTISEMENT_START: SegmentationTypeId = SegmentationTypeId(48);
+    /// End of an advertisement placed by the content provider (`0x31`).
     pub const PROVIDER_ADVERTISEMENT_END: SegmentationTypeId = SegmentationTypeId(49);
+    /// Start of an advertisement placed by the distributor (`0x32`).
     pub const DISTRIBUTOR_ADVERTISEMENT_START: SegmentationTypeId = SegmentationTypeId(50);
+    /// End of an advertisement placed by the distributor (`0x33`).
     pub const DISTRIBUTOR_ADVERTISEMENT_END: SegmentationTypeId = SegmentationTypeId(51);
+    /// Start of an opportunity for the provider to place content (`0x34`).
     pub const PROVIDER_PLACEMENT_OPPORTUNITY_START: SegmentationTypeId = SegmentationTypeId(52);
+    /// End of a provider placement opportunity (`0x35`).
     pub const PROVIDER_PLACEMENT_OPPORTUNITY_END: SegmentationTypeId = SegmentationTypeId(53);
+    /// Start of an opportunity for the distributor to place content (`0x36`).
     pub const DISTRIBUTOR_PLACEMENT_OPPORTUNITY_START: SegmentationTypeId = SegmentationTypeId(54);
+    /// End of a distributor placement opportunity (`0x37`).
     pub const DISTRIBUTOR_PLACEMENT_OPPORTUNITY_END: SegmentationTypeId = SegmentationTypeId(55);
+    /// Start of an event not on the regular schedule, such as breaking news (`0x40`).
     pub const UNSCHEDULED_EVENT_START: SegmentationTypeId = SegmentationTypeId(64);
+    /// End of an unscheduled event (`0x41`).
     pub const UNSCHEDULED_EVENT_END: SegmentationTypeId = SegmentationTypeId(65);
+    /// Start of a network feed (e.g. return from local programming, `0x50`).
     pub const NETWORK_START: SegmentationTypeId = SegmentationTypeId(80);
+    /// End of a network feed (`0x51`).
     pub const NETWORK_END: SegmentationTypeId = SegmentationTypeId(81);
 }
 impl SegmentationTypeId {
+    /// Wraps the raw byte value as a `SegmentationTypeId`.
     pub fn from_id(id: u8) -> SegmentationTypeId {
         SegmentationTypeId(id)
     }
 
+    /// Returns a human-readable description of this segmentation type.
     pub fn description(&self) -> &'static str {
         match *self {
             SegmentationTypeId::NOT_INDICATED => "Not Indicated",
@@ -454,23 +564,43 @@ impl SegmentationTypeId {
     }
 }
 
+/// Parsed _Segmentation Unique Program Identifier_ from a `segmentation_descriptor`.
+///
+/// Each variant corresponds to a different UPID scheme; see the [`upid`] module for the
+/// inner payload types.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SegmentationUpid {
+    /// No UPID present.
     None,
+    /// Deprecated user-defined UPID.
     UserDefined(upid::UserDefinedDeprecated),
+    /// Deprecated ISCI identifier.
     Isci(upid::IsciDeprecated),
+    /// Ad-ID identifier.
     AdID(upid::AdID),
+    /// Deprecated (non-versioned) ISAN.
     IsanDeprecated(upid::IsanDeprecated),
+    /// SMPTE UMID.
     Umid(upid::Umid),
+    /// Tribune Media Systems Program identifier.
     TID(upid::TID),
+    /// AiringID (formerly Turner ID).
     TI(upid::TI),
+    /// CableLabs metadata identifier.
     ADI(upid::ADI),
+    /// EIDR identifier in compact binary form.
     EIDR(upid::EIDR),
+    /// ATSC content identifier.
     ATSC(upid::ATSC),
+    /// Managed Private UPID.
     MPU(upid::MPU),
+    /// Multiple UPID structure containing a list of sub-UPIDs.
     MID(Vec<SegmentationUpid>),
+    /// Advertising information.
     ADS(upid::ADSInformation),
+    /// URI.
     URI(upid::Url),
+    /// Reserved or unrecognised UPID type with its raw bytes.
     Reserved(SegmentationUpidType, Vec<u8>),
 }
 impl SegmentationUpid {
@@ -519,6 +649,7 @@ impl SegmentationUpid {
         }
     }
 
+    /// Returns the encoded length of the UPID payload in bytes.
     pub fn segmentation_upid_length(&self) -> usize {
         match self {
             SegmentationUpid::None => 0,
@@ -545,6 +676,7 @@ impl SegmentationUpid {
         }
     }
 
+    /// Returns the `SegmentationUpidType` that corresponds to this UPID variant.
     pub fn segmentation_upid_type(&self) -> SegmentationUpidType {
         match self {
             SegmentationUpid::None => SegmentationUpidType::NotUsed,
@@ -691,11 +823,16 @@ fn chk_upid(
     }
 }
 
+/// Device group restrictions that may be applied to a segmentation descriptor.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum DeviceRestrictions {
+    /// Restrict to device group 0.
     RestrictGroup0,
+    /// Restrict to device group 1.
     RestrictGroup1,
+    /// Restrict to device group 2.
     RestrictGroup2,
+    /// No device restrictions.
     None,
 }
 impl DeviceRestrictions {
@@ -714,62 +851,99 @@ impl DeviceRestrictions {
     }
 }
 
+/// Delivery restriction flags from a `segmentation_descriptor`.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum DeliveryRestrictionFlags {
+    /// Delivery is not restricted.
     None,
+    /// Delivery restrictions are in effect.
     DeliveryRestrictions {
+        /// Whether web delivery of this segment is allowed.
         web_delivery_allowed_flag: bool,
+        /// When `true`, no regional blackout applies to this segment.
         no_regional_blackout_flag: bool,
+        /// Whether archiving of this segment is allowed.
         archive_allowed_flag: bool,
+        /// Device group restrictions.
         device_restrictions: DeviceRestrictions,
     },
 }
 
+/// Whether segmentation applies to the whole program or to individual components.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SegmentationMode {
+    /// Program-level segmentation.
     Program,
+    /// Component-level segmentation with per-component PTS offsets.
     Component {
+        /// The components affected by this segmentation event.
         components: Vec<SegmentationModeComponent>,
     },
 }
 
+/// A component entry within a component-mode `segmentation_descriptor`.
 #[derive(Debug, serde_derive::Serialize)]
 pub struct SegmentationModeComponent {
+    /// Identifies the elementary stream component, matching a `component_tag`
+    /// in the PMT's `stream_identifier_descriptor`.
     pub component_tag: u8,
+    /// PTS offset to be added to the `splice_time` to obtain this component's splice point.
     pub pts_offset: u64,
 }
 
+/// Parsed detail of a `segmentation_descriptor`.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SegmentationDescriptor {
+    /// This segmentation event has been cancelled.
     Cancel,
+    /// A segmentation event.
     Insert {
+        /// `true` when segmentation applies to the whole program rather than individual components.
         program_segmentation_flag: bool,
+        /// `true` when `segmentation_duration` is present.
         segmentation_duration_flag: bool,
+        /// `true` when delivery is not restricted.
         delivery_not_restricted_flag: bool,
+        /// Delivery restriction flags, if applicable.
         delivery_restrictions: DeliveryRestrictionFlags,
+        /// Program-level or component-level segmentation mode.
         segmentation_mode: SegmentationMode,
+        /// Duration of the segment in 90 kHz ticks, if signaled.
         segmentation_duration: Option<u64>,
+        /// The Unique Program Identifier for this segment.
         segmentation_upid: SegmentationUpid,
+        /// The type of segmentation (e.g. program start, ad break, etc.).
         segmentation_type_id: SegmentationTypeId,
+        /// Current segment number within the segmentation event.
         segment_num: u8,
+        /// Total number of expected segments.
         segments_expected: u8,
+        /// Optional sub-segment numbering.
         sub_segments: Option<SubSegments>,
     },
 }
 
+/// Optional sub-segment numbering that may appear at the end of a `segmentation_descriptor`.
 #[derive(Debug, serde_derive::Serialize)]
 pub struct SubSegments {
+    /// Current sub-segment number.
     pub sub_segment_num: u8,
+    /// Total number of expected sub-segments.
     pub sub_segments_expected: u8,
 }
 
+/// Duration of a break, as carried in a `break_duration()` structure.
 #[derive(Debug, serde_derive::Serialize)]
 pub struct SpliceDuration {
+    /// Whether return from the break is automatic or requires a subsequent command.
     pub return_mode: ReturnMode,
+    /// Duration of the break in 90 kHz ticks.
     pub duration: u64,
 }
 
+/// Callback trait for receiving parsed SCTE-35 splice information.
 pub trait SpliceInfoProcessor {
+    /// Called with a successfully parsed splice information section.
     // TODO: take &mut self?
     fn process(
         &self,
@@ -784,27 +958,44 @@ pub trait SpliceInfoProcessor {
     fn error(&self, _err: Scte35Error) {}
 }
 
+/// A parsed `splice_descriptor` from the descriptor loop of a _splice_info_section_.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceDescriptor {
+    /// An `avail_descriptor` (`tag 0x00`), identifying a specific avail.
     AvailDescriptor {
+        /// Provider-defined avail identifier.
         provider_avail_id: u32,
     },
+    /// A `DTMF_descriptor` (`tag 0x01`), carrying legacy DTMF signaling characters.
     DTMFDescriptor {
+        /// Pre-roll time in tenths of a second.
         preroll: u8,
+        /// DTMF characters (ASCII digit bytes).
         dtmf_chars: Vec<u8>,
     },
+    /// A `segmentation_descriptor` (`tag 0x02`).
     SegmentationDescriptor {
+        /// Unique identifier for this segmentation event.
         segmentation_event_id: u32,
+        /// Parsed detail of the segmentation descriptor.
         descriptor_detail: SegmentationDescriptor,
     },
+    /// A `time_descriptor` (`tag 0x03`), carrying a TAI time reference.
     TimeDescriptor {
+        /// Seconds since 1 January 1970 00:00:00 International Atomic Time (TAI).
         tai_seconds: u64,
+        /// Nanosecond component of the TAI time.
         tai_nanoseconds: u32,
+        /// Offset in seconds between TAI and UTC at the time this descriptor was generated.
         utc_offset: u16,
     },
+    /// An unrecognised or private descriptor.
     Reserved {
+        /// The `splice_descriptor_tag` byte.
         tag: u8,
+        /// The 32-bit identifier field.
         identifier: [u8; 4],
+        /// The remaining private payload bytes.
         private_bytes: Vec<u8>,
     },
 }
@@ -1066,33 +1257,47 @@ impl SpliceDescriptor {
     }
 }
 
+/// Errors that can occur while parsing a splice descriptor or its sub-fields.
 #[derive(Debug, serde_derive::Serialize)]
 pub enum SpliceDescriptorErr {
+    /// The `descriptor_length` value was invalid for the descriptor type.
     InvalidDescriptorLength(usize),
+    /// The data was too short to read the expected field.
     NotEnoughData {
+        /// Name of the field being parsed.
         field_name: &'static str,
+        /// Number of bytes needed.
         expected: usize,
+        /// Number of bytes actually available.
         actual: usize,
     },
     /// The segmentation_upid_length field value was `0`, but the segmentation_upid_type value was
     /// non-`0` (as indicated by the given `SegmentationUpidType` enum variant)
     SegmentationUpidLengthTypeMismatch(SegmentationUpidType),
-    /// The UPID field contained byte values that are invalid for the given UPID type
+    /// The UPID field contained byte values that are invalid for the given UPID type.
     InvalidUpidContent {
+        /// The UPID type that was being parsed.
         upid_type: SegmentationUpidType,
+        /// The raw bytes that could not be interpreted.
         bytes: Vec<u8>,
     },
-    /// The UPID field had a length invalid for its type
+    /// The UPID field had a length invalid for its type.
     InvalidUpidLength {
+        /// The UPID type that was being parsed.
         upid_type: SegmentationUpidType,
+        /// Expected length in bytes.
         expected: usize,
+        /// Actual length in bytes.
         actual: usize,
     },
     /// The parser consumed fewer bytes than the enclosing field contained, which indicates
     /// either a bug in this crate or malformed input data.
     LeftoverData {
+        /// Name of the field being parsed.
         field_name: &'static str,
+        /// Number of bytes consumed by the parser.
         consumed: usize,
+        /// Total number of bytes in the field.
         total: usize,
     },
 }
@@ -1106,16 +1311,31 @@ pub enum Scte35Error {
     /// The section's CRC check did not match the expected value of zero.
     CrcFailed(u32),
     /// The section was too short to contain a valid `splice_info_section`.
-    SectionTooShort { actual: usize, minimum: usize },
+    SectionTooShort {
+        /// Actual section length in bytes.
+        actual: usize,
+        /// Minimum required length in bytes.
+        minimum: usize,
+    },
     /// The section's `encrypted_packet` flag was set; this crate does not support
     /// decrypting SCTE-35 payloads.
     EncryptedNotSupported,
     /// The `splice_command_length` field named more bytes than remained in the section.
-    SpliceCommandLengthTooLong { command_len: usize, remaining: usize },
+    SpliceCommandLengthTooLong {
+        /// Declared command length in bytes.
+        command_len: usize,
+        /// Bytes remaining in the section.
+        remaining: usize,
+    },
     /// The section ended before the two-byte `descriptor_loop_length` field could be read.
     DescriptorLoopLengthShort,
     /// The `descriptor_loop_length` field named more bytes than remained in the section.
-    DescriptorLoopLengthTooLong { length: usize, remaining: usize },
+    DescriptorLoopLengthTooLong {
+        /// Declared descriptor loop length in bytes.
+        length: usize,
+        /// Bytes remaining in the section.
+        remaining: usize,
+    },
     /// The section carried a `splice_command_type` value that this crate does not (yet)
     /// know how to parse.
     UnhandledCommand(SpliceCommandType),
@@ -1163,6 +1383,8 @@ impl<T> ErrorFieldNamed<T> for Result<T, bitreader::BitReaderError> {
     }
 }
 
+/// The descriptor loop from a _splice_info_section_, iterable to yield individual
+/// [`SpliceDescriptor`] values.
 pub struct SpliceDescriptors<'buf> {
     buf: &'buf [u8],
 }
@@ -1187,6 +1409,7 @@ impl<'a> serde::Serialize for SpliceDescriptors<'a> {
     }
 }
 
+/// Iterator over the [`SpliceDescriptor`] entries in a descriptor loop.
 pub struct SpliceDescriptorIter<'buf> {
     buf: &'buf [u8],
 }
@@ -1232,6 +1455,8 @@ impl<'buf> Iterator for SpliceDescriptorIter<'buf> {
     }
 }
 
+/// A PSI section processor that parses SCTE-35 _splice_info_section_ data and delivers
+/// results to a [`SpliceInfoProcessor`] implementation.
 pub struct Scte35SectionProcessor<P, Ctx: demultiplex::DemuxContext>
 where
     P: SpliceInfoProcessor,
@@ -1334,6 +1559,8 @@ impl<P, Ctx: demultiplex::DemuxContext> Scte35SectionProcessor<P, Ctx>
 where
     P: SpliceInfoProcessor,
 {
+    /// Creates a new `Scte35SectionProcessor` that will deliver parsed results to the given
+    /// `processor`.
     pub fn new(processor: P) -> Scte35SectionProcessor<P, Ctx> {
         Scte35SectionProcessor {
             processor,
